@@ -41,51 +41,139 @@ class DashboardLayout:
     
     def render_header(self):
         """Render the dashboard header with title and description."""
-        st.title("🌬️ Air Quality vs Middle-Class Income Dashboard")
+        # Custom CSS for colorful metric cards inspired by the dashboard image
+        st.markdown("""
+        <style>
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 1rem;
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+            margin: 0.5rem 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .metric-card-orange {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        .metric-card-green {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        .metric-card-purple {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            color: #333;
+        }
+        .metric-card-blue {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .metric-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 0;
+        }
+        .metric-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin: 0;
+        }
+        </style>
+        """, unsafe_allow_html=True)
         
-        # Subtitle with key metrics
+        # Header with greeting style
+        col_title, col_actions = st.columns([3, 1])
+        
+        with col_title:
+            st.markdown("# 🌬️ Air Quality Dashboard")
+            st.markdown("**Exploring relationships between air quality, health, and economic indicators**")
+        
+        with col_actions:
+            if st.button("🔄 Refresh Data", help="Reload the dashboard data"):
+                st.experimental_rerun()
+        
+        # Colorful metric cards inspired by the dashboard image
         if self.data is not None and len(self.data) > 0:
+            st.markdown("### 📊 Overview")
+            
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
-                st.metric(
-                    "Total Records", 
-                    len(self.data),
-                    help="Number of data points in current view"
-                )
+                total_records = len(self.data)
+                st.markdown(f"""
+                <div class="metric-card metric-card-blue">
+                    <p class="metric-number">{total_records:,}</p>
+                    <p class="metric-label">📊 Records</p>
+                </div>
+                """, unsafe_allow_html=True)
             
             with col2:
                 unique_locations = self.data['location'].nunique() if 'location' in self.data.columns else 0
-                st.metric(
-                    "Locations", 
-                    unique_locations,
-                    help="Number of unique locations in dataset"
-                )
+                st.markdown(f"""
+                <div class="metric-card metric-card-orange">
+                    <p class="metric-number">{unique_locations}</p>
+                    <p class="metric-label">📍 Locations</p>
+                </div>
+                """, unsafe_allow_html=True)
             
             with col3:
+                if 'aqi' in self.data.columns:
+                    avg_aqi = self.data['aqi'].mean()
+                    st.markdown(f"""
+                    <div class="metric-card metric-card-green">
+                        <p class="metric-number">{avg_aqi:.0f}</p>
+                        <p class="metric-label">🌫️ Avg AQI</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="metric-card metric-card-green">
+                        <p class="metric-number">N/A</p>
+                        <p class="metric-label">🌫️ Avg AQI</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            with col4:
+                if 'respiratory_cases' in self.data.columns:
+                    total_cases = self.data['respiratory_cases'].sum()
+                    st.markdown(f"""
+                    <div class="metric-card metric-card-purple">
+                        <p class="metric-number">{total_cases:,}</p>
+                        <p class="metric-label">🏥 Total Cases</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="metric-card metric-card-purple">
+                        <p class="metric-number">N/A</p>
+                        <p class="metric-label">🏥 Total Cases</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            # Additional info row
+            st.markdown("---")
+            info_col1, info_col2, info_col3 = st.columns(3)
+            
+            with info_col1:
                 if 'date' in self.data.columns:
                     date_range = (
                         self.data['date'].min().strftime('%Y-%m-%d'),
                         self.data['date'].max().strftime('%Y-%m-%d')
                     )
-                    st.metric(
-                        "Date Range",
-                        "{} to {}".format(*date_range),
-                        help="Time period covered by current data"
-                    )
+                    st.info(f"📅 **Date Range:** {date_range[0]} to {date_range[1]}")
                 else:
-                    st.metric("Date Range", "N/A")
+                    st.info("📅 **Date Range:** Not available")
             
-            with col4:
+            with info_col2:
                 if self.filter_summary:
                     retention_rate = self.filter_summary.get('retention_rate', 0)
-                    st.metric(
-                        "Data Retention",
-                        "{:.1%}".format(retention_rate),
-                        help="Percentage of original data after filtering"
-                    )
+                    active_filters = self.filter_summary.get('active_filters', 0)
+                    st.info(f"🎛️ **Filters:** {active_filters} active ({retention_rate:.1%} data retained)")
                 else:
-                    st.metric("Data Retention", "100%")
+                    st.info("🎛️ **Filters:** None active (100% data retained)")
+            
+            with info_col3:
+                data_quality = "Good" if len(self.data) > 100 else "Limited" if len(self.data) > 10 else "Poor"
+                quality_color = "🟢" if data_quality == "Good" else "🟡" if data_quality == "Limited" else "🔴"
+                st.info(f"{quality_color} **Data Quality:** {data_quality}")
         
         st.markdown("---")
     
@@ -332,81 +420,219 @@ class DashboardLayout:
             st.error("No data available for environmental analysis.")
             return
         
+        # Check what environmental data is available
+        env_columns = ['temperature', 'wind_speed', 'season', 'aqi', 'pm25']
+        available_env_cols = [col for col in env_columns if col in self.data.columns]
+        
+        if len(available_env_cols) < 2:
+            st.warning("Insufficient environmental data for analysis. Available columns: {}".format(available_env_cols))
+            return
+        
         col1, col2 = st.columns(2)
         
         with col1:
             # AQI vs Temperature
             if 'aqi' in self.data.columns and 'temperature' in self.data.columns:
-                fig = px.scatter(
-                    self.data,
-                    x='temperature',
-                    y='aqi',
-                    title='AQI vs Temperature',
-                    labels={'temperature': 'Temperature (°C)', 'aqi': 'Air Quality Index'},
-                    trendline='ols'
-                )
-                fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
+                # Clean data for correlation
+                clean_data = self.data[['temperature', 'aqi']].dropna()
                 
-                # Calculate correlation
-                temp_aqi_corr = self.data['temperature'].corr(self.data['aqi'])
-                st.info("**Temperature-AQI Correlation**: {:.3f}".format(temp_aqi_corr))
+                if len(clean_data) > 1:
+                    fig = px.scatter(
+                        clean_data,
+                        x='temperature',
+                        y='aqi',
+                        title='🌡️ AQI vs Temperature',
+                        labels={'temperature': 'Temperature (°C)', 'aqi': 'Air Quality Index'},
+                        color='aqi',
+                        color_continuous_scale='Reds',
+                        trendline='ols'
+                    )
+                    fig.update_layout(
+                        height=400,
+                        showlegend=False,
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        paper_bgcolor='rgba(0,0,0,0)'
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Calculate correlation with error handling
+                    try:
+                        temp_aqi_corr = clean_data['temperature'].corr(clean_data['aqi'])
+                        if not pd.isna(temp_aqi_corr):
+                            # Classify correlation strength
+                            abs_corr = abs(temp_aqi_corr)
+                            if abs_corr < 0.3:
+                                strength = 'Weak'
+                                color = 'blue'
+                            elif abs_corr < 0.7:
+                                strength = 'Moderate'
+                                color = 'orange'
+                            else:
+                                strength = 'Strong'
+                                color = 'red'
+                            
+                            st.markdown(f"""
+                            <div style="padding: 10px; border-left: 4px solid {color}; background-color: #f0f2f6; border-radius: 5px;">
+                                <strong>Temperature-AQI Correlation:</strong> {temp_aqi_corr:.3f} ({strength})
+                            </div>
+                            """, unsafe_allow_html=True)
+                        else:
+                            st.info("Unable to calculate temperature-AQI correlation")
+                    except Exception as e:
+                        st.info("Correlation calculation not available")
+                else:
+                    st.info("Insufficient data points for temperature-AQI analysis")
             else:
-                st.info("Temperature or AQI data not available")
+                # Alternative visualization if temperature not available
+                if 'pm25' in self.data.columns and 'aqi' in self.data.columns:
+                    clean_data = self.data[['pm25', 'aqi']].dropna()
+                    if len(clean_data) > 1:
+                        fig = px.scatter(
+                            clean_data,
+                            x='pm25',
+                            y='aqi',
+                            title='🌫️ PM2.5 vs AQI',
+                            labels={'pm25': 'PM2.5 (μg/m³)', 'aqi': 'Air Quality Index'},
+                            color='aqi',
+                            color_continuous_scale='Reds',
+                            trendline='ols'
+                        )
+                        fig.update_layout(height=400, showlegend=False)
+                        st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("Temperature and PM2.5 data not available")
         
         with col2:
             # AQI vs Wind Speed
             if 'aqi' in self.data.columns and 'wind_speed' in self.data.columns:
-                fig = px.scatter(
-                    self.data,
-                    x='wind_speed',
-                    y='aqi',
-                    title='AQI vs Wind Speed',
-                    labels={'wind_speed': 'Wind Speed (m/s)', 'aqi': 'Air Quality Index'},
-                    trendline='ols'
-                )
-                fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
+                clean_data = self.data[['wind_speed', 'aqi']].dropna()
                 
-                # Calculate correlation
-                wind_aqi_corr = self.data['wind_speed'].corr(self.data['aqi'])
-                st.info("**Wind Speed-AQI Correlation**: {:.3f}".format(wind_aqi_corr))
+                if len(clean_data) > 1:
+                    fig = px.scatter(
+                        clean_data,
+                        x='wind_speed',
+                        y='aqi',
+                        title='💨 AQI vs Wind Speed',
+                        labels={'wind_speed': 'Wind Speed (m/s)', 'aqi': 'Air Quality Index'},
+                        color='aqi',
+                        color_continuous_scale='Blues',
+                        trendline='ols'
+                    )
+                    fig.update_layout(
+                        height=400,
+                        showlegend=False,
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        paper_bgcolor='rgba(0,0,0,0)'
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Calculate correlation with error handling
+                    try:
+                        wind_aqi_corr = clean_data['wind_speed'].corr(clean_data['aqi'])
+                        if not pd.isna(wind_aqi_corr):
+                            # Classify correlation strength
+                            abs_corr = abs(wind_aqi_corr)
+                            if abs_corr < 0.3:
+                                strength = 'Weak'
+                                color = 'blue'
+                            elif abs_corr < 0.7:
+                                strength = 'Moderate'
+                                color = 'orange'
+                            else:
+                                strength = 'Strong'
+                                color = 'red'
+                            
+                            st.markdown(f"""
+                            <div style="padding: 10px; border-left: 4px solid {color}; background-color: #f0f2f6; border-radius: 5px;">
+                                <strong>Wind Speed-AQI Correlation:</strong> {wind_aqi_corr:.3f} ({strength})
+                            </div>
+                            """, unsafe_allow_html=True)
+                        else:
+                            st.info("Unable to calculate wind speed-AQI correlation")
+                    except Exception as e:
+                        st.info("Correlation calculation not available")
+                else:
+                    st.info("Insufficient data points for wind speed-AQI analysis")
             else:
-                st.info("Wind speed or AQI data not available")
+                # Alternative: Show AQI distribution
+                if 'aqi' in self.data.columns:
+                    fig = px.histogram(
+                        self.data,
+                        x='aqi',
+                        title='📊 AQI Distribution',
+                        labels={'aqi': 'Air Quality Index', 'count': 'Frequency'},
+                        color_discrete_sequence=['#1f77b4']
+                    )
+                    fig.update_layout(height=400, showlegend=False)
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("Wind speed and AQI data not available")
         
-        # Seasonal analysis
-        if 'season' in self.data.columns:
+        # Seasonal analysis with improved error handling
+        if 'season' in self.data.columns and len(self.data['season'].dropna()) > 0:
             st.subheader("🍂 Seasonal Patterns")
             
             seasonal_col1, seasonal_col2 = st.columns(2)
             
             with seasonal_col1:
                 if 'aqi' in self.data.columns:
-                    seasonal_aqi = self.data.groupby('season')['aqi'].mean().reset_index()
-                    fig = px.bar(
-                        seasonal_aqi,
-                        x='season',
-                        y='aqi',
-                        title='Average AQI by Season',
-                        color='aqi',
-                        color_continuous_scale='Reds'
-                    )
-                    fig.update_layout(height=300)
-                    st.plotly_chart(fig, use_container_width=True)
+                    try:
+                        seasonal_data = self.data[['season', 'aqi']].dropna()
+                        if len(seasonal_data) > 0:
+                            seasonal_aqi = seasonal_data.groupby('season')['aqi'].agg(['mean', 'count']).reset_index()
+                            seasonal_aqi = seasonal_aqi[seasonal_aqi['count'] > 0]  # Only seasons with data
+                            
+                            if len(seasonal_aqi) > 0:
+                                fig = px.bar(
+                                    seasonal_aqi,
+                                    x='season',
+                                    y='mean',
+                                    title='🌤️ Average AQI by Season',
+                                    labels={'mean': 'Average AQI', 'season': 'Season'},
+                                    color='mean',
+                                    color_continuous_scale='Reds',
+                                    text='mean'
+                                )
+                                fig.update_traces(texttemplate='%{text:.1f}', textposition='outside')
+                                fig.update_layout(height=350, showlegend=False)
+                                st.plotly_chart(fig, use_container_width=True)
+                            else:
+                                st.info("No seasonal AQI data available")
+                        else:
+                            st.info("No seasonal AQI data available")
+                    except Exception as e:
+                        st.info("Unable to generate seasonal AQI chart")
             
             with seasonal_col2:
                 if 'respiratory_cases' in self.data.columns:
-                    seasonal_cases = self.data.groupby('season')['respiratory_cases'].mean().reset_index()
-                    fig = px.bar(
-                        seasonal_cases,
-                        x='season',
-                        y='respiratory_cases',
-                        title='Average Respiratory Cases by Season',
-                        color='respiratory_cases',
-                        color_continuous_scale='Blues'
-                    )
-                    fig.update_layout(height=300)
-                    st.plotly_chart(fig, use_container_width=True)
+                    try:
+                        seasonal_data = self.data[['season', 'respiratory_cases']].dropna()
+                        if len(seasonal_data) > 0:
+                            seasonal_cases = seasonal_data.groupby('season')['respiratory_cases'].agg(['mean', 'count']).reset_index()
+                            seasonal_cases = seasonal_cases[seasonal_cases['count'] > 0]  # Only seasons with data
+                            
+                            if len(seasonal_cases) > 0:
+                                fig = px.bar(
+                                    seasonal_cases,
+                                    x='season',
+                                    y='mean',
+                                    title='🏥 Average Respiratory Cases by Season',
+                                    labels={'mean': 'Average Cases', 'season': 'Season'},
+                                    color='mean',
+                                    color_continuous_scale='Blues',
+                                    text='mean'
+                                )
+                                fig.update_traces(texttemplate='%{text:.1f}', textposition='outside')
+                                fig.update_layout(height=350, showlegend=False)
+                                st.plotly_chart(fig, use_container_width=True)
+                            else:
+                                st.info("No seasonal respiratory cases data available")
+                        else:
+                            st.info("No seasonal respiratory cases data available")
+                    except Exception as e:
+                        st.info("Unable to generate seasonal respiratory cases chart")
+        else:
+            st.info("Seasonal data not available for pattern analysis")
     
     def render_statistical_summary_section(self):
         """Render the statistical summary section."""
@@ -416,65 +642,159 @@ class DashboardLayout:
             st.error("No data available for statistical analysis.")
             return
         
-        # Key statistics
+        # Key statistics with improved styling
+        st.markdown("#### 📊 Key Metrics")
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            if 'aqi' in self.data.columns:
+            if 'aqi' in self.data.columns and not self.data['aqi'].isna().all():
+                avg_aqi = self.data['aqi'].mean()
+                max_aqi = self.data['aqi'].max()
+                delta_aqi = avg_aqi - 100  # Compare to moderate AQI threshold
                 st.metric(
                     "Average AQI",
-                    "{:.1f}".format(self.data['aqi'].mean()),
-                    help="Mean Air Quality Index"
+                    "{:.1f}".format(avg_aqi),
+                    delta="{:.1f} vs moderate".format(delta_aqi),
+                    help="Mean Air Quality Index (100 = moderate threshold)"
                 )
+            else:
+                st.metric("Average AQI", "N/A", help="AQI data not available")
         
         with col2:
-            if 'pm25' in self.data.columns:
+            if 'pm25' in self.data.columns and not self.data['pm25'].isna().all():
+                avg_pm25 = self.data['pm25'].mean()
+                delta_pm25 = avg_pm25 - 35  # WHO guideline
                 st.metric(
                     "Average PM2.5",
-                    "{:.1f} μg/m³".format(self.data['pm25'].mean()),
-                    help="Mean PM2.5 concentration"
+                    "{:.1f} μg/m³".format(avg_pm25),
+                    delta="{:.1f} vs WHO".format(delta_pm25),
+                    help="Mean PM2.5 concentration (35 μg/m³ = WHO guideline)"
                 )
+            else:
+                st.metric("Average PM2.5", "N/A", help="PM2.5 data not available")
         
         with col3:
-            if 'respiratory_cases' in self.data.columns:
+            if 'respiratory_cases' in self.data.columns and not self.data['respiratory_cases'].isna().all():
+                total_cases = int(self.data['respiratory_cases'].sum())
+                avg_cases = self.data['respiratory_cases'].mean()
                 st.metric(
                     "Total Cases",
-                    "{:,}".format(int(self.data['respiratory_cases'].sum())),
-                    help="Total respiratory cases"
+                    "{:,}".format(total_cases),
+                    delta="Avg: {:.1f}".format(avg_cases),
+                    help="Total respiratory cases in dataset"
                 )
+            else:
+                st.metric("Total Cases", "N/A", help="Respiratory cases data not available")
         
         with col4:
+            sample_size = len(self.data)
+            original_size = self.filter_summary.get('original_records', sample_size) if self.filter_summary else sample_size
+            retention = sample_size / original_size if original_size > 0 else 1
             st.metric(
                 "Sample Size",
-                "{:,}".format(len(self.data)),
-                help="Number of data points"
+                "{:,}".format(sample_size),
+                delta="{:.1%} retained".format(retention),
+                help="Number of data points after filtering"
             )
         
-        # Correlation matrix
-        numeric_cols = self.data.select_dtypes(include=['float64', 'int64']).columns
+        # Enhanced correlation analysis
+        numeric_cols = self.data.select_dtypes(include=['float64', 'int64', 'float32', 'int32']).columns
         if len(numeric_cols) > 1:
-            st.subheader("🔗 Correlation Matrix")
+            st.markdown("#### 🔗 Correlation Analysis")
             
             # Select key columns for correlation
             key_cols = []
-            for col in ['aqi', 'pm25', 'respiratory_cases', 'temperature', 'wind_speed']:
-                if col in numeric_cols:
+            col_labels = {}
+            for col, label in [('aqi', 'AQI'), ('pm25', 'PM2.5'), ('respiratory_cases', 'Respiratory Cases'), 
+                              ('temperature', 'Temperature'), ('wind_speed', 'Wind Speed')]:
+                if col in numeric_cols and not self.data[col].isna().all():
                     key_cols.append(col)
+                    col_labels[col] = label
             
             if len(key_cols) > 1:
-                corr_matrix = self.data[key_cols].corr()
+                # Calculate correlation matrix with clean data
+                clean_data = self.data[key_cols].dropna()
                 
-                fig = px.imshow(
-                    corr_matrix,
-                    text_auto=True,
-                    aspect="auto",
-                    title="Correlation Matrix of Key Variables",
-                    color_continuous_scale='RdBu_r',
-                    zmin=-1,
-                    zmax=1
-                )
-                fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
+                if len(clean_data) > 1:
+                    corr_matrix = clean_data.corr()
+                    
+                    # Create correlation heatmap
+                    fig = px.imshow(
+                        corr_matrix,
+                        text_auto='.3f',
+                        aspect="auto",
+                        title="🔗 Correlation Matrix of Key Variables",
+                        color_continuous_scale='RdBu_r',
+                        zmin=-1,
+                        zmax=1,
+                        labels=dict(x="Variables", y="Variables", color="Correlation")
+                    )
+                    
+                    # Update layout for better appearance
+                    fig.update_layout(
+                        height=500,
+                        font=dict(size=12),
+                        title_x=0.5,
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        paper_bgcolor='rgba(0,0,0,0)'
+                    )
+                    
+                    # Update axis labels
+                    fig.update_xaxes(tickangle=45)
+                    fig.update_yaxes(tickangle=0)
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Show strongest correlations
+                    st.markdown("#### 🎯 Strongest Correlations")
+                    
+                    # Find strongest correlations (excluding self-correlations)
+                    correlations = []
+                    for i in range(len(key_cols)):
+                        for j in range(i+1, len(key_cols)):
+                            corr_val = corr_matrix.iloc[i, j]
+                            if not pd.isna(corr_val):
+                                correlations.append({
+                                    'var1': col_labels.get(key_cols[i], key_cols[i]),
+                                    'var2': col_labels.get(key_cols[j], key_cols[j]),
+                                    'correlation': corr_val,
+                                    'abs_correlation': abs(corr_val)
+                                })
+                    
+                    # Sort by absolute correlation and show top 3
+                    correlations.sort(key=lambda x: x['abs_correlation'], reverse=True)
+                    
+                    corr_col1, corr_col2, corr_col3 = st.columns(3)
+                    
+                    for idx, corr in enumerate(correlations[:3]):
+                        col = [corr_col1, corr_col2, corr_col3][idx]
+                        
+                        # Determine strength and color
+                        abs_corr = corr['abs_correlation']
+                        if abs_corr >= 0.7:
+                            strength = "Strong"
+                            color = "#e74c3c"
+                        elif abs_corr >= 0.3:
+                            strength = "Moderate"
+                            color = "#f39c12"
+                        else:
+                            strength = "Weak"
+                            color = "#3498db"
+                        
+                        with col:
+                            st.markdown(f"""
+                            <div style="padding: 15px; border: 2px solid {color}; border-radius: 10px; text-align: center; background-color: #f8f9fa;">
+                                <h4 style="color: {color}; margin: 0;">{corr['correlation']:.3f}</h4>
+                                <p style="margin: 5px 0; font-weight: bold;">{corr['var1']} ↔ {corr['var2']}</p>
+                                <p style="margin: 0; color: {color}; font-size: 0.9em;">{strength} Correlation</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                else:
+                    st.info("Insufficient clean data for correlation analysis")
+            else:
+                st.info("Need at least 2 numeric variables for correlation analysis")
+        else:
+            st.info("No numeric data available for correlation analysis")
     
     def render_footer(self):
         """Render the footer with data sources and methodology."""

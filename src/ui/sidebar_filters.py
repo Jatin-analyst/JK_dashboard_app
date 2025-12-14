@@ -345,14 +345,12 @@ class SidebarFilters:
                 income_stress_max=threshold_filters['income_stress_max']
             )
         
-        if any([statistical_filters['sample_size_min'] > 1,
-                statistical_filters['data_completeness_min'] > 0.0,
-                statistical_filters['exclude_outliers']]):
-            self.filter_manager.apply_statistical_filter(
-                sample_size_min=statistical_filters['sample_size_min'],
-                data_completeness_min=statistical_filters['data_completeness_min'],
-                exclude_outliers=statistical_filters['exclude_outliers']
-            )
+        # Always apply statistical filters (they have built-in checks for meaningful values)
+        self.filter_manager.apply_statistical_filter(
+            sample_size_min=statistical_filters['sample_size_min'],
+            data_completeness_min=statistical_filters['data_completeness_min'],
+            exclude_outliers=statistical_filters['exclude_outliers']
+        )
         
         # Get filtered data and summary
         filtered_data = self.filter_manager.get_filtered_dataset()

@@ -200,32 +200,47 @@ class FilterManager:
             data_completeness_min: Minimum data completeness (0-1)
             exclude_outliers: Whether to exclude statistical outliers
         """
-        if sample_size_min is not None:
+        # Check if we have any data to work with
+        if self.filtered_data is None or len(self.filtered_data) == 0:
+            return self.filtered_data
+        
+        if sample_size_min is not None and sample_size_min > 1:
             if len(self.filtered_data) < sample_size_min:
                 # If current data doesn't meet minimum, return empty DataFrame
                 self.filtered_data = self.filtered_data.iloc[0:0]
+                self.current_filters['sample_size_min'] = sample_size_min
+                return self.filtered_data
             self.current_filters['sample_size_min'] = sample_size_min
         
-        if data_completeness_min is not None:
-            # Calculate completeness for each row
-            completeness = self.filtered_data.count(axis=1) / len(self.filtered_data.columns)
-            self.filtered_data = self.filtered_data[completeness >= data_completeness_min]
+        if data_completeness_min is not None and data_completeness_min > 0.0:
+            # Calculate completeness for each row (excluding completely empty columns)
+            non_empty_cols = [col for col in self.filtered_data.columns 
+                            if not self.filtered_data[col].isna().all()]
+            if len(non_empty_cols) > 0:
+                completeness = self.filtered_data[non_empty_cols].count(axis=1) / len(non_empty_cols)
+                self.filtered_data = self.filtered_data[completeness >= data_completeness_min]
             self.current_filters['data_completeness_min'] = data_completeness_min
         
-        if exclude_outliers:
-            # Remove outliers using IQR method for numeric columns
-            numeric_columns = self.filtered_data.select_dtypes(include=[np.number]).columns
-            for col in numeric_columns:
-                if col in ['aqi', 'pm25', 'respiratory_cases']:  # Key columns for outlier detection
-                    Q1 = self.filtered_data[col].quantile(0.25)
-                    Q3 = self.filtered_data[col].quantile(0.75)
-                    IQR = Q3 - Q1
-                    lower_bound = Q1 - 1.5 * IQR
-                    upper_bound = Q3 + 1.5 * IQR
-                    self.filtered_data = self.filtered_data[
-                        (self.filtered_data[col] >= lower_bound) & 
-                        (self.filtered_data[col] <= upper_bound)
-                    ]
+        if exclude_outliers and len(self.filtered_data) > 0:
+            # Remove outliers using IQR method for key numeric columns
+            key_columns = ['aqi', 'pm25', 'respiratory_cases']
+            for col in key_columns:
+                if col in self.filtered_data.columns and len(self.filtered_data) > 4:  # Need at least 5 points for IQR
+                    try:
+                        Q1 = self.filtered_data[col].quantile(0.25)
+                        Q3 = self.filtered_data[col].quantile(0.75)
+                        IQR = Q3 - Q1
+                        
+                        if IQR > 0:  # Avoid division by zero
+                            lower_bound = Q1 - 1.5 * IQR
+                            upper_bound = Q3 + 1.5 * IQR
+                            self.filtered_data = self.filtered_data[
+                                (self.filtered_data[col] >= lower_bound) & 
+                                (self.filtered_data[col] <= upper_bound)
+                            ]
+                    except Exception as e:
+                        # Skip outlier removal for this column if there's an error
+                        continue
             self.current_filters['exclude_outliers'] = exclude_outliers
         
         return self.filtered_data
