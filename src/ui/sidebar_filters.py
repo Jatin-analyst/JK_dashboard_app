@@ -42,18 +42,30 @@ class SidebarFilters:
         """Create location-based filter controls."""
         st.sidebar.subheader("📍 Geographic Filters")
         
-        # Location multi-select
+        # Location multi-select with enhanced help
         locations = self.available_values.get('locations', [])
         if locations:
+            st.sidebar.caption(f"💡 {len(locations)} locations available")
             selected_locations = st.sidebar.multiselect(
                 "Select Locations",
                 options=locations,
                 default=locations,  # All selected by default
-                help="Choose specific cities or regions to analyze"
+                help=f"""
+                Choose specific cities or regions to analyze.
+                
+                📊 Available locations: {len(locations)}
+                🎯 Tip: Select fewer locations for focused analysis
+                🔄 Use 'Select All' to include all locations
+                """
             )
+            
+            # Show selection summary
+            if len(selected_locations) != len(locations):
+                st.sidebar.caption(f"🎯 Selected: {len(selected_locations)}/{len(locations)} locations")
         else:
             selected_locations = []
-            st.sidebar.info("No location data available")
+            st.sidebar.warning("⚠️ No location data available")
+            st.sidebar.caption("Check if data files are properly loaded")
         
         return selected_locations
     
@@ -94,42 +106,89 @@ class SidebarFilters:
         """Create environmental and pollution filter controls."""
         st.sidebar.subheader("🌍 Environmental Filters")
         
-        # Season multi-select
+        # Season multi-select with enhanced help
         seasons = self.available_values.get('seasons', [])
         if seasons:
+            st.sidebar.caption(f"🌤️ {len(seasons)} seasons available")
             selected_seasons = st.sidebar.multiselect(
                 "Seasons",
                 options=seasons,
                 default=seasons,
-                help="Filter by seasonal patterns"
+                help="""
+                Filter by seasonal patterns to analyze weather-related trends.
+                
+                🌸 Spring: March-May
+                ☀️ Summer: June-August  
+                🍂 Fall: September-November
+                ❄️ Winter: December-February
+                """
             )
         else:
             selected_seasons = []
+            st.sidebar.info("ℹ️ No seasonal data available")
         
-        # AQI range slider
+        # AQI range slider with quality indicators
         numeric_ranges = self.available_values.get('numeric_ranges', {})
         aqi_range = numeric_ranges.get('aqi', {'min': 0, 'max': 500})
         
-        st.sidebar.write("**Air Quality Index (AQI)**")
+        st.sidebar.write("**🌫️ Air Quality Index (AQI)**")
         aqi_min, aqi_max = st.sidebar.slider(
             "AQI Range",
             min_value=int(aqi_range['min']),
             max_value=int(aqi_range['max']),
             value=(int(aqi_range['min']), int(aqi_range['max'])),
-            help="Filter by Air Quality Index levels"
+            help="""
+            Air Quality Index scale:
+            
+            🟢 Good: 0-50
+            🟡 Moderate: 51-100
+            🟠 Unhealthy for Sensitive: 101-150
+            🔴 Unhealthy: 151-200
+            🟣 Very Unhealthy: 201-300
+            🟤 Hazardous: 301+
+            """
         )
         
-        # PM2.5 range slider
+        # Show AQI quality indicator
+        if aqi_min <= 50 and aqi_max <= 50:
+            st.sidebar.success("🟢 Good air quality range")
+        elif aqi_min <= 100 and aqi_max <= 100:
+            st.sidebar.info("🟡 Moderate air quality range")
+        elif aqi_max > 200:
+            st.sidebar.error("🔴 Unhealthy air quality range")
+        else:
+            st.sidebar.warning("🟠 Sensitive groups affected")
+        
+        # PM2.5 range slider with health context
         pm25_range = numeric_ranges.get('pm25', {'min': 0, 'max': 200})
         
-        st.sidebar.write("**PM2.5 Levels (μg/m³)**")
+        st.sidebar.write("**🔬 PM2.5 Levels (μg/m³)**")
         pm25_min, pm25_max = st.sidebar.slider(
             "PM2.5 Range",
             min_value=float(pm25_range['min']),
             max_value=float(pm25_range['max']),
             value=(float(pm25_range['min']), float(pm25_range['max'])),
-            help="Filter by PM2.5 particulate matter levels"
+            help="""
+            PM2.5 (fine particulate matter) guidelines:
+            
+            🟢 WHO Guideline: ≤15 μg/m³ (annual)
+            🟡 Moderate: 15-35 μg/m³
+            🟠 High: 35-75 μg/m³
+            🔴 Very High: >75 μg/m³
+            
+            Lower values indicate cleaner air.
+            """
         )
+        
+        # Show PM2.5 health indicator
+        if pm25_max <= 15:
+            st.sidebar.success("🟢 WHO guideline compliant")
+        elif pm25_max <= 35:
+            st.sidebar.info("🟡 Moderate PM2.5 levels")
+        elif pm25_max <= 75:
+            st.sidebar.warning("🟠 High PM2.5 levels")
+        else:
+            st.sidebar.error("🔴 Very high PM2.5 levels")
         
         return {
             'seasons': selected_seasons,
@@ -234,65 +293,145 @@ class SidebarFilters:
         """Create statistical and data quality filter controls."""
         st.sidebar.subheader("📈 Statistical Filters")
         
-        # Sample size requirement
-        min_sample_size = st.sidebar.number_input(
-            "Minimum Sample Size",
-            min_value=1,
-            max_value=1000,
-            value=10,
-            help="Minimum number of records required for analysis"
+        # Initialize session state for statistical filters
+        if 'statistical_filters_enabled' not in st.session_state:
+            st.session_state.statistical_filters_enabled = False
+        
+        # Enable/disable statistical filtering
+        enable_statistical = st.sidebar.checkbox(
+            "Enable Advanced Statistical Filtering",
+            value=st.session_state.statistical_filters_enabled,
+            key="enable_statistical_filters",
+            help="Turn on advanced statistical filtering options"
         )
         
-        # Data completeness requirement
-        min_completeness = st.sidebar.slider(
-            "Minimum Data Completeness",
-            min_value=0.0,
-            max_value=1.0,
-            value=0.8,
-            step=0.05,
-            format="%.0%%",
-            help="Minimum percentage of complete data required"
-        )
+        if enable_statistical != st.session_state.statistical_filters_enabled:
+            st.session_state.statistical_filters_enabled = enable_statistical
         
-        # Outlier exclusion
-        exclude_outliers = st.sidebar.checkbox(
-            "Exclude Statistical Outliers",
-            value=False,
-            help="Remove statistical outliers using IQR method"
-        )
-        
-        return {
-            'sample_size_min': min_sample_size,
-            'data_completeness_min': min_completeness,
-            'exclude_outliers': exclude_outliers
-        }
+        if enable_statistical:
+            # Sample size requirement with validation
+            current_data_size = len(self.available_values.get('locations', [])) * 100  # Rough estimate
+            max_reasonable_sample = min(1000, current_data_size)
+            
+            min_sample_size = st.sidebar.number_input(
+                "Minimum Sample Size",
+                min_value=1,
+                max_value=max_reasonable_sample,
+                value=min(st.session_state.get('min_sample_size', 10), max_reasonable_sample),
+                key="statistical_sample_size",
+                help="Minimum number of records required for analysis"
+            )
+            
+            # Real-time validation for sample size
+            if hasattr(self, 'filter_manager') and self.filter_manager.filtered_data is not None:
+                current_size = len(self.filter_manager.filtered_data)
+                if current_size < min_sample_size:
+                    st.sidebar.error(f"🚨 Sample size ({min_sample_size}) > available data ({current_size:,})")
+                elif current_size < min_sample_size * 2:
+                    st.sidebar.warning(f"⚠️ Sample size close to data limit ({current_size:,} available)")
+                else:
+                    st.sidebar.success(f"✅ Sample size OK ({current_size:,} available)")
+            
+            # Data completeness requirement with preview
+            min_completeness = st.sidebar.slider(
+                "Minimum Data Completeness",
+                min_value=0.0,
+                max_value=1.0,
+                value=st.session_state.get('min_completeness', 0.8),
+                step=0.05,
+                format="%.0%%",
+                key="statistical_completeness",
+                help="Minimum percentage of complete data required"
+            )
+            
+            # Show completeness impact
+            if min_completeness > 0.9:
+                st.sidebar.warning("⚠️ Very high completeness requirement may exclude most data")
+            elif min_completeness > 0.7:
+                st.sidebar.info("ℹ️ Moderate completeness requirement")
+            
+            # Outlier exclusion with explanation
+            exclude_outliers = st.sidebar.checkbox(
+                "Exclude Statistical Outliers",
+                value=st.session_state.get('exclude_outliers', False),
+                key="statistical_outliers",
+                help="Remove statistical outliers using IQR method (removes ~5% of extreme values)"
+            )
+            
+            if exclude_outliers:
+                st.sidebar.caption("📊 Outliers removed using Interquartile Range (IQR) method")
+            
+            # Store values in session state
+            st.session_state.min_sample_size = min_sample_size
+            st.session_state.min_completeness = min_completeness
+            st.session_state.exclude_outliers = exclude_outliers
+            
+            # Validate filter combination
+            if hasattr(self, 'filter_manager'):
+                validation = self.filter_manager.validate_filter_combination(
+                    sample_size_min=min_sample_size,
+                    data_completeness_min=min_completeness,
+                    exclude_outliers=exclude_outliers
+                )
+                
+                if validation['warnings']:
+                    for warning in validation['warnings']:
+                        st.sidebar.warning(f"⚠️ {warning}")
+            
+            return {
+                'sample_size_min': min_sample_size,
+                'data_completeness_min': min_completeness,
+                'exclude_outliers': exclude_outliers
+            }
+        else:
+            # Return default values when disabled
+            return {
+                'sample_size_min': 1,
+                'data_completeness_min': 0.0,
+                'exclude_outliers': False
+            }
     
     def create_filter_summary(self):
         """Create filter summary and control section."""
         st.sidebar.subheader("🔧 Filter Controls")
         
-        # Reset filters button
-        if st.sidebar.button("Reset All Filters", help="Clear all filters and return to original data"):
-            # Clear session state filter values
-            filter_keys = [
-                'selected_locations', 'selected_demographics', 'selected_environmental',
-                'selected_temporal', 'selected_thresholds', 'selected_statistical'
-            ]
-            for key in filter_keys:
-                if key in st.session_state:
-                    del st.session_state[key]
-            st.experimental_rerun()
+        # Reset filters button with improved functionality
+        col1, col2 = st.sidebar.columns(2)
+        
+        with col1:
+            if st.button("🔄 Reset All", key="reset_all_filters", help="Clear all filters and return to original data"):
+                # Clear all filter-related session state
+                filter_keys = [
+                    'selected_locations', 'selected_demographics', 'selected_environmental',
+                    'selected_temporal', 'selected_thresholds', 'selected_statistical',
+                    'statistical_filters_enabled', 'min_sample_size', 'min_completeness',
+                    'exclude_outliers', 'selected_pollutant', 'last_filter_hash'
+                ]
+                for key in filter_keys:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                
+                # Reset to default values
+                st.session_state.selected_pollutant = 'AQI'
+                st.session_state.statistical_filters_enabled = False
+                
+                st.sidebar.success("✅ Filters reset!")
+                st.experimental_rerun()
+        
+        with col2:
+            if st.button("📊 Apply", key="apply_filters", help="Apply current filter settings"):
+                st.experimental_rerun()
         
         # Export filtered data button
-        if st.sidebar.button("Export Filtered Data", help="Download current filtered dataset"):
+        if st.sidebar.button("📥 Export Data", key="export_filtered_data", help="Download current filtered dataset"):
             # This would trigger a download in a real implementation
-            st.sidebar.success("Export functionality would be implemented here")
+            st.sidebar.info("📋 Export functionality available in full version")
     
     def apply_all_filters(self, data, location_filters, demographic_filters, 
                          environmental_filters, temporal_filters, threshold_filters, 
                          statistical_filters):
         """
-        Apply all selected filters to the data.
+        Apply all selected filters to the data with improved error handling and feedback.
         
         Args:
             data: Original DataFrame
@@ -306,57 +445,127 @@ class SidebarFilters:
         Returns:
             Filtered DataFrame and filter summary
         """
-        # Initialize filter manager with data
-        self.filter_manager.set_data(data)
-        
-        # Apply filters in sequence
-        if location_filters:
-            self.filter_manager.apply_location_filter(location_filters)
-        
-        if demographic_filters['age_groups'] or demographic_filters['genders']:
-            self.filter_manager.apply_demographic_filter(
-                age_groups=demographic_filters['age_groups'] if demographic_filters['age_groups'] else None,
-                genders=demographic_filters['genders'] if demographic_filters['genders'] else None
-            )
-        
-        if any([environmental_filters['seasons'], 
+        try:
+            # Initialize filter manager with data
+            self.filter_manager.set_data(data)
+            original_size = len(data)
+            
+            # Track filter application progress
+            filter_steps = []
+            
+            # Apply location filters
+            if location_filters:
+                before_size = len(self.filter_manager.get_filtered_dataset())
+                self.filter_manager.apply_location_filter(location_filters)
+                after_size = len(self.filter_manager.get_filtered_dataset())
+                filter_steps.append(f"Location: {before_size} → {after_size} records")
+            
+            # Apply demographic filters
+            if demographic_filters['age_groups'] or demographic_filters['genders']:
+                before_size = len(self.filter_manager.get_filtered_dataset())
+                self.filter_manager.apply_demographic_filter(
+                    age_groups=demographic_filters['age_groups'] if demographic_filters['age_groups'] else None,
+                    genders=demographic_filters['genders'] if demographic_filters['genders'] else None
+                )
+                after_size = len(self.filter_manager.get_filtered_dataset())
+                filter_steps.append(f"Demographics: {before_size} → {after_size} records")
+            
+            # Apply environmental filters
+            env_filters_active = any([
+                environmental_filters['seasons'], 
                 environmental_filters['aqi_min'] != environmental_filters['aqi_max'],
-                environmental_filters['pm25_min'] != environmental_filters['pm25_max']]):
-            self.filter_manager.apply_environmental_filter(
-                seasons=environmental_filters['seasons'] if environmental_filters['seasons'] else None,
-                aqi_min=environmental_filters['aqi_min'],
-                aqi_max=environmental_filters['aqi_max'],
-                pm25_min=environmental_filters['pm25_min'],
-                pm25_max=environmental_filters['pm25_max']
+                environmental_filters['pm25_min'] != environmental_filters['pm25_max']
+            ])
+            
+            if env_filters_active:
+                before_size = len(self.filter_manager.get_filtered_dataset())
+                self.filter_manager.apply_environmental_filter(
+                    seasons=environmental_filters['seasons'] if environmental_filters['seasons'] else None,
+                    aqi_min=environmental_filters['aqi_min'],
+                    aqi_max=environmental_filters['aqi_max'],
+                    pm25_min=environmental_filters['pm25_min'],
+                    pm25_max=environmental_filters['pm25_max']
+                )
+                after_size = len(self.filter_manager.get_filtered_dataset())
+                filter_steps.append(f"Environmental: {before_size} → {after_size} records")
+            
+            # Apply temporal filters
+            if temporal_filters['start_date'] or temporal_filters['end_date']:
+                before_size = len(self.filter_manager.get_filtered_dataset())
+                self.filter_manager.apply_temporal_filter(
+                    start_date=temporal_filters['start_date'],
+                    end_date=temporal_filters['end_date']
+                )
+                after_size = len(self.filter_manager.get_filtered_dataset())
+                filter_steps.append(f"Temporal: {before_size} → {after_size} records")
+            
+            # Apply threshold filters
+            threshold_filters_active = any([
+                threshold_filters['respiratory_cases_min'] != threshold_filters['respiratory_cases_max'],
+                threshold_filters['income_stress_min'] is not None
+            ])
+            
+            if threshold_filters_active:
+                before_size = len(self.filter_manager.get_filtered_dataset())
+                self.filter_manager.apply_threshold_filter(
+                    respiratory_cases_min=threshold_filters['respiratory_cases_min'],
+                    respiratory_cases_max=threshold_filters['respiratory_cases_max'],
+                    income_stress_min=threshold_filters['income_stress_min'],
+                    income_stress_max=threshold_filters['income_stress_max']
+                )
+                after_size = len(self.filter_manager.get_filtered_dataset())
+                filter_steps.append(f"Thresholds: {before_size} → {after_size} records")
+            
+            # Apply statistical filters if enabled
+            statistical_active = (
+                statistical_filters['sample_size_min'] > 1 or 
+                statistical_filters['data_completeness_min'] > 0.0 or 
+                statistical_filters['exclude_outliers']
             )
-        
-        if temporal_filters['start_date'] or temporal_filters['end_date']:
-            self.filter_manager.apply_temporal_filter(
-                start_date=temporal_filters['start_date'],
-                end_date=temporal_filters['end_date']
-            )
-        
-        if any([threshold_filters['respiratory_cases_min'] != threshold_filters['respiratory_cases_max'],
-                threshold_filters['income_stress_min'] is not None]):
-            self.filter_manager.apply_threshold_filter(
-                respiratory_cases_min=threshold_filters['respiratory_cases_min'],
-                respiratory_cases_max=threshold_filters['respiratory_cases_max'],
-                income_stress_min=threshold_filters['income_stress_min'],
-                income_stress_max=threshold_filters['income_stress_max']
-            )
-        
-        # Always apply statistical filters (they have built-in checks for meaningful values)
-        self.filter_manager.apply_statistical_filter(
-            sample_size_min=statistical_filters['sample_size_min'],
-            data_completeness_min=statistical_filters['data_completeness_min'],
-            exclude_outliers=statistical_filters['exclude_outliers']
-        )
-        
-        # Get filtered data and summary
-        filtered_data = self.filter_manager.get_filtered_dataset()
-        filter_summary = self.filter_manager.get_filter_summary()
-        
-        return filtered_data, filter_summary
+            
+            if statistical_active:
+                before_size = len(self.filter_manager.get_filtered_dataset())
+                
+                # Validate before applying
+                validation = self.filter_manager.validate_filter_combination(**statistical_filters)
+                
+                if validation['is_valid'] or before_size > 0:
+                    self.filter_manager.apply_statistical_filter(
+                        sample_size_min=statistical_filters['sample_size_min'],
+                        data_completeness_min=statistical_filters['data_completeness_min'],
+                        exclude_outliers=statistical_filters['exclude_outliers']
+                    )
+                    after_size = len(self.filter_manager.get_filtered_dataset())
+                    filter_steps.append(f"Statistical: {before_size} → {after_size} records")
+                    
+                    # Add warnings to filter steps if any
+                    if validation['warnings']:
+                        for warning in validation['warnings']:
+                            filter_steps.append(f"⚠️ {warning}")
+                else:
+                    filter_steps.append("Statistical: Skipped (would result in empty dataset)")
+            
+            # Get filtered data and summary
+            filtered_data = self.filter_manager.get_filtered_dataset()
+            filter_summary = self.filter_manager.get_filter_summary()
+            
+            # Add filter steps to summary
+            filter_summary['filter_steps'] = filter_steps
+            
+            # Check for potential issues
+            final_size = len(filtered_data)
+            if final_size == 0:
+                st.sidebar.error("⚠️ All data filtered out! Please relax some filters.")
+            elif final_size < 10:
+                st.sidebar.warning(f"⚠️ Very small dataset ({final_size} records). Results may be unreliable.")
+            elif final_size / original_size < 0.1:
+                st.sidebar.warning(f"⚠️ Filters removed {((original_size - final_size) / original_size * 100):.1f}% of data.")
+            
+            return filtered_data, filter_summary
+            
+        except Exception as e:
+            st.sidebar.error(f"Error applying filters: {str(e)}")
+            return data, {'error': str(e), 'original_records': len(data), 'filtered_records': len(data)}
     
     def render_complete_sidebar(self, data):
         """
@@ -408,22 +617,41 @@ class SidebarFilters:
             temporal_filters, threshold_filters, statistical_filters
         )
         
-        # Display filter summary
+        # Display enhanced filter summary
         st.sidebar.markdown("---")
         st.sidebar.subheader("📋 Filter Summary")
-        st.sidebar.metric(
-            "Records Shown", 
-            filter_summary['filtered_records'],
-            delta=filter_summary['records_removed'] * -1
-        )
-        st.sidebar.metric(
-            "Retention Rate",
-            "{:.1%}".format(filter_summary['retention_rate'])
-        )
-        st.sidebar.metric(
-            "Active Filters",
-            filter_summary['active_filters']
-        )
+        
+        # Main metrics
+        col1, col2 = st.sidebar.columns(2)
+        with col1:
+            st.metric(
+                "Records", 
+                f"{filter_summary['filtered_records']:,}",
+                delta=f"-{filter_summary['records_removed']:,}" if filter_summary['records_removed'] > 0 else None
+            )
+        with col2:
+            st.metric(
+                "Retention",
+                f"{filter_summary['retention_rate']:.1%}",
+                delta=f"{filter_summary['active_filters']} filters"
+            )
+        
+        # Show filter steps if available
+        if 'filter_steps' in filter_summary and filter_summary['filter_steps']:
+            with st.sidebar.expander("🔍 Filter Details", expanded=False):
+                for step in filter_summary['filter_steps']:
+                    st.caption(f"• {step}")
+        
+        # Data quality indicator
+        retention_rate = filter_summary['retention_rate']
+        if retention_rate >= 0.8:
+            st.sidebar.success("🟢 Good data retention")
+        elif retention_rate >= 0.5:
+            st.sidebar.warning("🟡 Moderate data retention")
+        elif retention_rate >= 0.1:
+            st.sidebar.warning("🟠 Low data retention")
+        else:
+            st.sidebar.error("🔴 Very low data retention")
         
         return filtered_data, filter_summary
 

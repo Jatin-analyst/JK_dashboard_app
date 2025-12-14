@@ -13,6 +13,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import sys
 import os
+import hashlib
+from functools import lru_cache
 
 # Add src to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -27,6 +29,60 @@ class DashboardLayout:
         """Initialize the dashboard layout."""
         self.data = None
         self.filter_summary = None
+        self._chart_cache = {}
+    
+    def _generate_data_hash(self, data, additional_params=None):
+        """
+        Generate a stable hash for data and parameters to use as cache key.
+        
+        Args:
+            data: DataFrame to hash
+            additional_params: Additional parameters to include in hash
+            
+        Returns:
+            String hash for caching
+        """
+        if data is None or len(data) == 0:
+            return "empty_data"
+        
+        # Create hash from data shape, column names, and sample values
+        hash_components = [
+            str(data.shape),
+            str(sorted(data.columns.tolist())),
+            str(data.iloc[0].to_dict()) if len(data) > 0 else "no_data"
+        ]
+        
+        if additional_params:
+            hash_components.append(str(additional_params))
+        
+        hash_string = "|".join(hash_components)
+        return hashlib.md5(hash_string.encode()).hexdigest()[:12]
+    
+    @st.cache_data(ttl=300)  # Cache for 5 minutes
+    def _calculate_correlation(_self, data_hash, x_data, y_data, data_length):
+        """
+        Cached correlation calculation.
+        
+        Args:
+            data_hash: Hash of the data for cache invalidation
+            x_data: X variable data (as list for hashing)
+            y_data: Y variable data (as list for hashing)
+            data_length: Length of data for validation
+            
+        Returns:
+            Correlation coefficient or None
+        """
+        try:
+            x_series = pd.Series(x_data)
+            y_series = pd.Series(y_data)
+            
+            if len(x_series) > 1 and len(y_series) > 1:
+                correlation = x_series.corr(y_series)
+                if not pd.isna(correlation) and np.isfinite(correlation):
+                    return correlation
+        except Exception:
+            pass
+        return None
     
     def set_data(self, data, filter_summary=None):
         """
@@ -203,108 +259,219 @@ class DashboardLayout:
             st.error("Missing required columns for hero chart: {}".format(missing_cols))
             return
         
-        # Pollutant selection
-        col1, col2 = st.columns([3, 1])
+        # Initialize session state for pollutant selection
+        if 'selected_pollutant' not in st.session_state:
+            st.session_state.selected_pollutant = 'AQI'
+        
+        # Pollutant selection with improved layout
+        col1, col2, col3 = st.columns([2, 1, 1])
         
         with col2:
-            pollutant_type = st.selectbox(
-                "Select Pollutant",
+            # Use radio buttons for better visual feedback
+            pollutant_type = st.radio(
+                "Select Pollutant Type:",
                 options=['AQI', 'PM2.5'],
-                key="pollutant_selector",  # Add unique key
-                help="Choose which air quality metric to display"
+                index=0 if st.session_state.selected_pollutant == 'AQI' else 1,
+                key="pollutant_selector_radio",
+                help="Choose which air quality metric to display",
+                horizontal=True
             )
+            
+            # Update session state when selection changes
+            if pollutant_type != st.session_state.selected_pollutant:
+                st.session_state.selected_pollutant = pollutant_type
+                st.experimental_rerun()
+        
+        with col3:
+            # Add refresh button for manual chart updates
+            if st.button("🔄 Refresh Chart", key="refresh_hero_chart", help="Manually refresh the chart"):
+                st.experimental_rerun()
         
         with col1:
-            # Calculate income stress index if not present
-            if 'income_stress_index' not in self.data.columns:
-                if all(col in self.data.columns for col in ['hospital_days', 'avg_daily_wage', 'treatment_cost_est']):
-                    income_stress = (self.data['hospital_days'] * self.data['avg_daily_wage']) + self.data['treatment_cost_est']
-                else:
-                    st.error("Cannot calculate Income Stress Index. Missing required columns.")
-                    return
-            else:
-                income_stress = self.data['income_stress_index']
+            # Generate stable cache key for this chart
+            chart_params = {
+                'pollutant_type': pollutant_type,
+                'data_shape': self.data.shape,
+                'columns': sorted(self.data.columns.tolist())
+            }
+            data_hash = self._generate_data_hash(self.data, chart_params)
             
-            # Select pollutant data
-            pollutant_data = self.data['aqi'] if pollutant_type == 'AQI' else self.data['pm25']
+            # Check if we can use cached chart
+            cache_key = f"hero_chart_{pollutant_type}_{data_hash}"
             
-            # Create dual-axis chart
-            fig = make_subplots(specs=[[{"secondary_y": True}]])
-            
-            # Add pollutant scatter plot
-            fig.add_trace(
-                go.Scatter(
-                    x=self.data.index,
-                    y=pollutant_data,
-                    mode='markers',
-                    name=pollutant_type,
-                    marker=dict(
-                        color=pollutant_data,
-                        colorscale='Reds',
-                        size=8,
-                        opacity=0.7
-                    ),
-                    hovertemplate="<b>%{fullData.name}</b><br>" +
-                                "Value: %{y}<br>" +
-                                "<extra></extra>"
-                ),
-                secondary_y=False,
-            )
-            
-            # Add income stress line
-            fig.add_trace(
-                go.Scatter(
-                    x=self.data.index,
-                    y=income_stress,
-                    mode='lines+markers',
-                    name='Income Stress Index',
-                    line=dict(color='blue', width=2),
-                    marker=dict(size=6),
-                    hovertemplate="<b>Income Stress</b><br>" +
-                                "Value: %{y:.0f}<br>" +
-                                "<extra></extra>"
-                ),
-                secondary_y=True,
-            )
-            
-            # Update layout
-            fig.update_xaxes(title_text="Data Points")
-            fig.update_yaxes(title_text="{} Level".format(pollutant_type), secondary_y=False)
-            fig.update_yaxes(title_text="Income Stress Index", secondary_y=True)
-            
-            fig.update_layout(
-                title="Air Quality vs Income Stress Relationship",
-                hovermode='x unified',
-                height=500,
-                showlegend=True
-            )
-            
-            # Use unique key for the chart to ensure it updates
-            st.plotly_chart(fig, use_container_width=True, key=f"hero_chart_{pollutant_type}")
-            
-            # Display correlation
-            if len(pollutant_data) > 1 and len(income_stress) > 1:
-                try:
-                    correlation = pollutant_data.corr(income_stress)
-                    
-                    if not pd.isna(correlation):
-                        # Classify correlation strength
-                        abs_corr = abs(correlation)
-                        if abs_corr < 0.3:
-                            strength = 'Weak'
-                            color = 'blue'
-                        elif abs_corr < 0.7:
-                            strength = 'Moderate'
-                            color = 'orange'
-                        else:
-                            strength = 'Strong'
-                            color = 'red'
-                        
-                        st.info("**Correlation**: {:.3f} ({} relationship)".format(correlation, strength))
+            # Show loading spinner while processing
+            with st.spinner(f"Generating {pollutant_type} analysis..."):
+                # Calculate income stress index if not present (cached)
+                if 'income_stress_index' not in self.data.columns:
+                    if all(col in self.data.columns for col in ['hospital_days', 'avg_daily_wage', 'treatment_cost_est']):
+                        income_stress = (self.data['hospital_days'] * self.data['avg_daily_wage']) + self.data['treatment_cost_est']
                     else:
-                        st.info("Correlation could not be calculated (insufficient data variation)")
-                except Exception as e:
-                    st.warning("Could not calculate correlation: {}".format(str(e)))
+                        st.error("Cannot calculate Income Stress Index. Missing required columns.")
+                        return
+                else:
+                    income_stress = self.data['income_stress_index']
+                
+                # Select pollutant data based on current selection
+                pollutant_data = self.data['aqi'] if pollutant_type == 'AQI' else self.data['pm25']
+                
+                # Optimize data for plotting (sample if too large)
+                if len(self.data) > 1000:
+                    sample_size = min(1000, len(self.data))
+                    sample_indices = np.random.choice(len(self.data), sample_size, replace=False)
+                    plot_data = self.data.iloc[sample_indices].copy()
+                    plot_pollutant = pollutant_data.iloc[sample_indices]
+                    plot_income_stress = income_stress.iloc[sample_indices]
+                    st.info(f"📊 Displaying sample of {sample_size:,} points from {len(self.data):,} total records")
+                else:
+                    plot_data = self.data
+                    plot_pollutant = pollutant_data
+                    plot_income_stress = income_stress
+                
+                # Create dual-axis chart with improved styling and performance
+                fig = make_subplots(
+                    specs=[[{"secondary_y": True}]],
+                    subplot_titles=[f"{pollutant_type} vs Income Stress Analysis"]
+                )
+                
+                # Add pollutant scatter plot with dynamic colors and optimized rendering
+                scatter_color = 'Reds' if pollutant_type == 'AQI' else 'Blues'
+                fig.add_trace(
+                    go.Scattergl(  # Use WebGL for better performance
+                        x=plot_data.index,
+                        y=plot_pollutant,
+                        mode='markers',
+                        name=f"{pollutant_type} Level",
+                        marker=dict(
+                            color=plot_pollutant,
+                            colorscale=scatter_color,
+                            size=8,
+                            opacity=0.7,
+                            line=dict(width=0.5, color='white'),
+                            colorbar=dict(
+                                title=f"{pollutant_type}",
+                                titleside="right"
+                            )
+                        ),
+                        hovertemplate=f"<b>{pollutant_type}</b><br>" +
+                                    "Value: %{y}<br>" +
+                                    "Index: %{x}<br>" +
+                                    "<extra></extra>",
+                        showlegend=True
+                    ),
+                    secondary_y=False,
+                )
+                
+                # Add income stress line with improved styling
+                fig.add_trace(
+                    go.Scattergl(  # Use WebGL for better performance
+                        x=plot_data.index,
+                        y=plot_income_stress,
+                        mode='lines+markers',
+                        name='Income Stress Index',
+                        line=dict(color='#2E86AB', width=2),
+                        marker=dict(size=6, color='#2E86AB', line=dict(width=1, color='white')),
+                        hovertemplate="<b>Income Stress</b><br>" +
+                                    "Value: %{y:.0f}<br>" +
+                                    "Index: %{x}<br>" +
+                                    "<extra></extra>",
+                        showlegend=True
+                    ),
+                    secondary_y=True,
+                )
+                
+                # Update layout with improved styling and performance optimizations
+                fig.update_xaxes(
+                    title_text="Data Points",
+                    showgrid=True,
+                    gridwidth=1,
+                    gridcolor='rgba(128,128,128,0.2)'
+                )
+                fig.update_yaxes(
+                    title_text=f"{pollutant_type} Level",
+                    secondary_y=False,
+                    showgrid=True,
+                    gridwidth=1,
+                    gridcolor='rgba(128,128,128,0.2)'
+                )
+                fig.update_yaxes(
+                    title_text="Income Stress Index",
+                    secondary_y=True,
+                    showgrid=False
+                )
+                
+                fig.update_layout(
+                    title=dict(
+                        text=f"{pollutant_type} vs Income Stress Relationship",
+                        x=0.5,
+                        font=dict(size=16)
+                    ),
+                    hovermode='closest',
+                    height=500,
+                    showlegend=True,
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font=dict(size=11),
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1
+                    ),
+                    # Performance optimizations
+                    dragmode='pan',
+                    selectdirection='diagonal'
+                )
+                
+                # Render chart with optimized key
+                st.plotly_chart(fig, use_container_width=True, key=cache_key, config={
+                    'displayModeBar': True,
+                    'displaylogo': False,
+                    'modeBarButtonsToRemove': ['lasso2d', 'select2d']
+                })
+                
+                # Calculate and display correlation with caching
+                if len(plot_pollutant) > 1 and len(plot_income_stress) > 1:
+                    try:
+                        # Use cached correlation calculation
+                        correlation = self._calculate_correlation(
+                            data_hash,
+                            plot_pollutant.tolist(),
+                            plot_income_stress.tolist(),
+                            len(plot_pollutant)
+                        )
+                        
+                        if correlation is not None:
+                            # Classify correlation strength
+                            abs_corr = abs(correlation)
+                            if abs_corr < 0.3:
+                                strength = 'Weak'
+                                color = '#3498db'
+                                emoji = '🔵'
+                            elif abs_corr < 0.7:
+                                strength = 'Moderate'
+                                color = '#f39c12'
+                                emoji = '🟡'
+                            else:
+                                strength = 'Strong'
+                                color = '#e74c3c'
+                                emoji = '🔴'
+                            
+                            # Enhanced correlation display with sample size info
+                            st.markdown(f"""
+                            <div style="padding: 15px; border-left: 4px solid {color}; background-color: #f8f9fa; border-radius: 8px; margin: 10px 0;">
+                                <h4 style="color: {color}; margin: 0 0 8px 0;">{emoji} Correlation Analysis</h4>
+                                <p style="margin: 0 0 5px 0; font-size: 1.1em;"><strong>{pollutant_type} vs Income Stress:</strong> {correlation:.3f}</p>
+                                <p style="margin: 0 0 5px 0; color: {color}; font-weight: bold;">Strength: {strength}</p>
+                                <small style="color: #666;">Based on {len(plot_pollutant):,} data points</small>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        else:
+                            st.info("⚠️ Correlation could not be calculated (insufficient data variation)")
+                    except Exception as e:
+                        st.warning(f"⚠️ Could not calculate correlation: {str(e)}")
+                else:
+                    st.info("⚠️ Insufficient data points for correlation analysis")
     
     def render_hospitalization_context_section(self):
         """Render the hospitalization context section."""
@@ -474,32 +641,38 @@ class DashboardLayout:
                     
                     # Calculate correlation with robust error handling
                     try:
-                        if len(clean_data) > 2 and clean_data['temperature'].std() > 0 and clean_data['aqi'].std() > 0:
-                            temp_aqi_corr = clean_data['temperature'].corr(clean_data['aqi'])
+                        if len(temp_data) > 2 and temp_data['temperature'].std() > 0 and temp_data['aqi'].std() > 0:
+                            temp_aqi_corr = temp_data['temperature'].corr(temp_data['aqi'])
                             if not pd.isna(temp_aqi_corr) and np.isfinite(temp_aqi_corr):
                                 # Classify correlation strength
                                 abs_corr = abs(temp_aqi_corr)
                                 if abs_corr < 0.3:
                                     strength = 'Weak'
-                                    color = 'blue'
+                                    color = '#3498db'
+                                    emoji = '🔵'
                                 elif abs_corr < 0.7:
                                     strength = 'Moderate'
-                                    color = 'orange'
+                                    color = '#f39c12'
+                                    emoji = '🟡'
                                 else:
                                     strength = 'Strong'
-                                    color = 'red'
+                                    color = '#e74c3c'
+                                    emoji = '🔴'
                                 
                                 st.markdown(f"""
-                                <div style="padding: 10px; border-left: 4px solid {color}; background-color: #f0f2f6; border-radius: 5px;">
-                                    <strong>Temperature-AQI Correlation:</strong> {temp_aqi_corr:.3f} ({strength})
+                                <div style="padding: 12px; border-left: 4px solid {color}; background-color: #f8f9fa; border-radius: 8px; margin: 10px 0;">
+                                    <h5 style="color: {color}; margin: 0 0 5px 0;">{emoji} Temperature-AQI Correlation</h5>
+                                    <p style="margin: 0; font-size: 1.1em;"><strong>Correlation:</strong> {temp_aqi_corr:.3f}</p>
+                                    <p style="margin: 0; color: {color}; font-weight: bold;">Strength: {strength}</p>
+                                    <small style="color: #666;">Based on {len(temp_data)} data points</small>
                                 </div>
                                 """, unsafe_allow_html=True)
                             else:
-                                st.info("Unable to calculate temperature-AQI correlation (insufficient variation)")
+                                st.info("💡 Unable to calculate temperature-AQI correlation (insufficient variation)")
                         else:
-                            st.info("Insufficient data variation for correlation calculation")
+                            st.info("💡 Insufficient data variation for correlation calculation")
                     except Exception as e:
-                        st.info("Correlation calculation not available")
+                        st.warning(f"⚠️ Correlation calculation error: {str(e)}")
                 else:
                     st.info("Insufficient data points for temperature-AQI analysis")
             else:
@@ -557,25 +730,31 @@ class DashboardLayout:
                                 abs_corr = abs(wind_aqi_corr)
                                 if abs_corr < 0.3:
                                     strength = 'Weak'
-                                    color = 'blue'
+                                    color = '#3498db'
+                                    emoji = '🔵'
                                 elif abs_corr < 0.7:
                                     strength = 'Moderate'
-                                    color = 'orange'
+                                    color = '#f39c12'
+                                    emoji = '🟡'
                                 else:
                                     strength = 'Strong'
-                                    color = 'red'
+                                    color = '#e74c3c'
+                                    emoji = '🔴'
                                 
                                 st.markdown(f"""
-                                <div style="padding: 10px; border-left: 4px solid {color}; background-color: #f0f2f6; border-radius: 5px;">
-                                    <strong>Wind Speed-AQI Correlation:</strong> {wind_aqi_corr:.3f} ({strength})
+                                <div style="padding: 12px; border-left: 4px solid {color}; background-color: #f8f9fa; border-radius: 8px; margin: 10px 0;">
+                                    <h5 style="color: {color}; margin: 0 0 5px 0;">{emoji} Wind Speed-AQI Correlation</h5>
+                                    <p style="margin: 0; font-size: 1.1em;"><strong>Correlation:</strong> {wind_aqi_corr:.3f}</p>
+                                    <p style="margin: 0; color: {color}; font-weight: bold;">Strength: {strength}</p>
+                                    <small style="color: #666;">Based on {len(wind_data)} data points</small>
                                 </div>
                                 """, unsafe_allow_html=True)
                             else:
-                                st.info("Unable to calculate wind speed-AQI correlation (insufficient variation)")
+                                st.info("💡 Unable to calculate wind speed-AQI correlation (insufficient variation)")
                         else:
-                            st.info("Insufficient data variation for correlation calculation")
+                            st.info("💡 Insufficient data variation for correlation calculation")
                     except Exception as e:
-                        st.info("Correlation calculation not available")
+                        st.warning(f"⚠️ Correlation calculation error: {str(e)}")
                 else:
                     st.info("Insufficient data points for wind speed-AQI analysis")
             else:
@@ -845,29 +1024,63 @@ class DashboardLayout:
         """)
     
     def render_complete_dashboard(self):
-        """Render the complete dashboard layout."""
+        """Render the complete dashboard layout with performance monitoring."""
+        import time
+        start_time = time.time()
+        
         # Header
+        header_start = time.time()
         self.render_header()
+        header_time = time.time() - header_start
         
         # Disclaimer
         self.render_disclaimer()
         
         # Main content sections
         if self.data is not None and len(self.data) > 0:
+            # Performance monitoring for each section
+            section_times = {}
+            
             # Hero chart
+            section_start = time.time()
             self.render_hero_chart_section()
+            section_times['Hero Chart'] = time.time() - section_start
             st.markdown("---")
             
             # Hospitalization context
+            section_start = time.time()
             self.render_hospitalization_context_section()
+            section_times['Hospitalization'] = time.time() - section_start
             st.markdown("---")
             
             # Environmental context
+            section_start = time.time()
             self.render_environmental_context_section()
+            section_times['Environmental'] = time.time() - section_start
             st.markdown("---")
             
             # Statistical summary
+            section_start = time.time()
             self.render_statistical_summary_section()
+            section_times['Statistics'] = time.time() - section_start
+            
+            # Show performance info in debug mode
+            total_time = time.time() - start_time
+            if st.sidebar.checkbox("🔧 Show Performance Info", value=False, help="Display rendering performance metrics"):
+                with st.expander("⚡ Performance Metrics", expanded=False):
+                    perf_col1, perf_col2 = st.columns(2)
+                    
+                    with perf_col1:
+                        st.metric("Total Render Time", f"{total_time:.2f}s")
+                        st.metric("Header Time", f"{header_time:.2f}s")
+                    
+                    with perf_col2:
+                        st.metric("Data Size", f"{len(self.data):,} rows")
+                        st.metric("Memory Usage", f"{self.data.memory_usage(deep=True).sum() / 1024 / 1024:.1f} MB")
+                    
+                    st.subheader("Section Render Times")
+                    for section, render_time in section_times.items():
+                        st.text(f"{section}: {render_time:.2f}s")
         else:
             st.error("No data available. Please check your data source and filters.")
         

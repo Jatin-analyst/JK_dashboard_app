@@ -341,6 +341,47 @@ class FilterManager:
         """Get the currently applied filters."""
         return self.current_filters.copy()
     
+    def validate_filter_combination(self, **filter_params):
+        """
+        Validate filter combination before applying to prevent empty results.
+        
+        Args:
+            **filter_params: Filter parameters to validate
+            
+        Returns:
+            Dictionary with validation results and warnings
+        """
+        validation_result = {
+            'is_valid': True,
+            'warnings': [],
+            'estimated_retention': 1.0
+        }
+        
+        if self.filtered_data is None or len(self.filtered_data) == 0:
+            validation_result['is_valid'] = False
+            validation_result['warnings'].append("No data available for filtering")
+            return validation_result
+        
+        current_size = len(self.filtered_data)
+        
+        # Check sample size requirements
+        sample_size_min = filter_params.get('sample_size_min', 0)
+        if sample_size_min > current_size:
+            validation_result['warnings'].append(f"Sample size requirement ({sample_size_min}) exceeds available data ({current_size})")
+            validation_result['estimated_retention'] = 0.0
+        
+        # Check data completeness impact
+        data_completeness_min = filter_params.get('data_completeness_min', 0.0)
+        if data_completeness_min > 0.8:
+            validation_result['warnings'].append("High completeness requirement may significantly reduce dataset")
+        
+        # Check for overly restrictive combinations
+        active_filters = len(self.current_filters)
+        if active_filters > 5:
+            validation_result['warnings'].append("Many filters active - consider simplifying for better results")
+        
+        return validation_result
+    
     def get_filter_summary(self):
         """
         Get a summary of current filtering status.
