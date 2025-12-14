@@ -103,15 +103,6 @@ def optimize_data_types(df):
     return optimized_df
 
 
-def health_check():
-    """Health check endpoint for deployment monitoring"""
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "version": "1.0.0"
-    }
-
-
 def main():
     """Main application entry point"""
     st.set_page_config(

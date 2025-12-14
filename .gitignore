@@ -3,75 +3,29 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
 
 # Virtual environments
 .env
 .venv
 env/
 venv/
-ENV/
-env.bak/
-venv.bak/
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# pytest
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Hypothesis
-.hypothesis/
-
-# Streamlit
+# Streamlit secrets (add via Streamlit Cloud interface)
 .streamlit/secrets.toml
 
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
 # Logs
 *.log
-logs/
 
 # Temporary files
 *.tmp
 *.temp
-temp/
-tmp/
-
-# Data files (if sensitive)
-# Uncomment if your data contains sensitive information
-# data/*.csv
-# data/*.json
-# data/*.xlsx

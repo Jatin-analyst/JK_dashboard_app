@@ -1,30 +1,6 @@
-[global]
-# Production settings for Streamlit deployment
-developmentMode = false
-showWarningOnDirectExecution = false
-
-[server]
-# Server configuration
-headless = true
-enableCORS = false
-enableXsrfProtection = true
-maxUploadSize = 200
-maxMessageSize = 200
-
-[browser]
-# Browser settings
-gatherUsageStats = false
-serverAddress = "0.0.0.0"
-
 [theme]
-# Theme configuration
 primaryColor = "#FF6B6B"
 backgroundColor = "#FFFFFF"
 secondaryBackgroundColor = "#F0F2F6"
 textColor = "#262730"
 font = "sans serif"
-
-[logger]
-# Logging configuration
-level = "info"
-messageFormat = "%(asctime)s %(message)s"
