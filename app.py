@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Air Quality vs Middle-Class Income Dashboard
 

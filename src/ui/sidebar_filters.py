@@ -430,7 +430,7 @@ class SidebarFilters:
 
 def create_sidebar_filters(data):
     """
-    Convenience function to create sidebar filters.
+    Convenience function to create sidebar filters with proper state management.
     
     Args:
         data: DataFrame to create filters for
@@ -438,8 +438,19 @@ def create_sidebar_filters(data):
     Returns:
         Tuple of (filtered_data, filter_summary)
     """
+    # Initialize session state for filters if not exists
+    if 'filter_state' not in st.session_state:
+        st.session_state.filter_state = {}
+    
     sidebar_filters = SidebarFilters()
-    return sidebar_filters.render_complete_sidebar(data)
+    filtered_data, filter_summary = sidebar_filters.render_complete_sidebar(data)
+    
+    # Update the filter hash to trigger re-renders when filters change
+    current_hash = hash(str(filtered_data.shape) + str(filter_summary))
+    if st.session_state.get('last_filter_hash') != current_hash:
+        st.session_state.last_filter_hash = current_hash
+    
+    return filtered_data, filter_summary
 
 
 if __name__ == "__main__":

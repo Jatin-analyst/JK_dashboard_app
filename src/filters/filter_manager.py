@@ -204,44 +204,76 @@ class FilterManager:
         if self.filtered_data is None or len(self.filtered_data) == 0:
             return self.filtered_data
         
-        if sample_size_min is not None and sample_size_min > 1:
+        # Sample size filter with improved validation
+        if sample_size_min is not None and sample_size_min > 0:
             if len(self.filtered_data) < sample_size_min:
-                # If current data doesn't meet minimum, return empty DataFrame
-                self.filtered_data = self.filtered_data.iloc[0:0]
+                # If current data doesn't meet minimum, return empty DataFrame with same structure
+                self.filtered_data = self.filtered_data.iloc[0:0].copy()
                 self.current_filters['sample_size_min'] = sample_size_min
                 return self.filtered_data
             self.current_filters['sample_size_min'] = sample_size_min
         
-        if data_completeness_min is not None and data_completeness_min > 0.0:
-            # Calculate completeness for each row (excluding completely empty columns)
-            non_empty_cols = [col for col in self.filtered_data.columns 
-                            if not self.filtered_data[col].isna().all()]
-            if len(non_empty_cols) > 0:
-                completeness = self.filtered_data[non_empty_cols].count(axis=1) / len(non_empty_cols)
-                self.filtered_data = self.filtered_data[completeness >= data_completeness_min]
-            self.current_filters['data_completeness_min'] = data_completeness_min
+        # Data completeness filter with robust handling
+        if data_completeness_min is not None and 0.0 <= data_completeness_min <= 1.0:
+            try:
+                # Calculate completeness for each row (excluding completely empty columns)
+                non_empty_cols = []
+                for col in self.filtered_data.columns:
+                    if not self.filtered_data[col].isna().all():
+                        non_empty_cols.append(col)
+                
+                if len(non_empty_cols) > 0:
+                    # Calculate row-wise completeness
+                    completeness = self.filtered_data[non_empty_cols].count(axis=1) / len(non_empty_cols)
+                    # Filter rows that meet completeness threshold
+                    mask = completeness >= data_completeness_min
+                    self.filtered_data = self.filtered_data[mask]
+                    self.current_filters['data_completeness_min'] = data_completeness_min
+                else:
+                    # If no non-empty columns, return empty dataset
+                    self.filtered_data = self.filtered_data.iloc[0:0].copy()
+            except Exception as e:
+                # If completeness calculation fails, skip this filter
+                pass
         
-        if exclude_outliers and len(self.filtered_data) > 0:
-            # Remove outliers using IQR method for key numeric columns
-            key_columns = ['aqi', 'pm25', 'respiratory_cases']
-            for col in key_columns:
-                if col in self.filtered_data.columns and len(self.filtered_data) > 4:  # Need at least 5 points for IQR
-                    try:
-                        Q1 = self.filtered_data[col].quantile(0.25)
-                        Q3 = self.filtered_data[col].quantile(0.75)
-                        IQR = Q3 - Q1
-                        
-                        if IQR > 0:  # Avoid division by zero
-                            lower_bound = Q1 - 1.5 * IQR
-                            upper_bound = Q3 + 1.5 * IQR
-                            self.filtered_data = self.filtered_data[
-                                (self.filtered_data[col] >= lower_bound) & 
-                                (self.filtered_data[col] <= upper_bound)
-                            ]
-                    except Exception as e:
-                        # Skip outlier removal for this column if there's an error
-                        continue
-            self.current_filters['exclude_outliers'] = exclude_outliers
+        # Outlier exclusion with robust error handling
+        if exclude_outliers and len(self.filtered_data) > 10:  # Need sufficient data for outlier detection
+            try:
+                # Remove outliers using IQR method for key numeric columns
+                key_columns = ['aqi', 'pm25', 'respiratory_cases']
+                
+                for col in key_columns:
+                    if col in self.filtered_data.columns and len(self.filtered_data) > 10:
+                        try:
+                            # Get numeric data only
+                            col_data = pd.to_numeric(self.filtered_data[col], errors='coerce')
+                            col_data = col_data.dropna()
+                            
+                            if len(col_data) > 10:  # Need sufficient data for quartiles
+                                Q1 = col_data.quantile(0.25)
+                                Q3 = col_data.quantile(0.75)
+                                IQR = Q3 - Q1
+                                
+                                # Only apply outlier removal if IQR is meaningful
+                                if IQR > 0 and not pd.isna(IQR):
+                                    lower_bound = Q1 - 1.5 * IQR
+                                    upper_bound = Q3 + 1.5 * IQR
+                                    
+                                    # Create mask for non-outliers
+                                    mask = (
+                                        (pd.to_numeric(self.filtered_data[col], errors='coerce') >= lower_bound) & 
+                                        (pd.to_numeric(self.filtered_data[col], errors='coerce') <= upper_bound)
+                                    ) | pd.to_numeric(self.filtered_data[col], errors='coerce').isna()
+                                    
+                                    self.filtered_data = self.filtered_data[mask]
+                        except Exception as e:
+                            # Skip outlier removal for this column if there's an error
+                            continue
+                
+                self.current_filters['exclude_outliers'] = exclude_outliers
+            except Exception as e:
+                # If outlier detection fails completely, skip it
+                pass
         
         return self.filtered_data
     

@@ -7,6 +7,7 @@ hospitalization context, environmental context, statistical summary, and disclai
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -209,6 +210,7 @@ class DashboardLayout:
             pollutant_type = st.selectbox(
                 "Select Pollutant",
                 options=['AQI', 'PM2.5'],
+                key="pollutant_selector",  # Add unique key
                 help="Choose which air quality metric to display"
             )
         
@@ -277,25 +279,32 @@ class DashboardLayout:
                 showlegend=True
             )
             
-            st.plotly_chart(fig, use_container_width=True)
+            # Use unique key for the chart to ensure it updates
+            st.plotly_chart(fig, use_container_width=True, key=f"hero_chart_{pollutant_type}")
             
             # Display correlation
             if len(pollutant_data) > 1 and len(income_stress) > 1:
-                correlation = pollutant_data.corr(income_stress)
-                
-                # Classify correlation strength
-                abs_corr = abs(correlation)
-                if abs_corr < 0.3:
-                    strength = 'Weak'
-                    color = 'blue'
-                elif abs_corr < 0.7:
-                    strength = 'Moderate'
-                    color = 'orange'
-                else:
-                    strength = 'Strong'
-                    color = 'red'
-                
-                st.info("**Correlation**: {:.3f} ({} relationship)".format(correlation, strength))
+                try:
+                    correlation = pollutant_data.corr(income_stress)
+                    
+                    if not pd.isna(correlation):
+                        # Classify correlation strength
+                        abs_corr = abs(correlation)
+                        if abs_corr < 0.3:
+                            strength = 'Weak'
+                            color = 'blue'
+                        elif abs_corr < 0.7:
+                            strength = 'Moderate'
+                            color = 'orange'
+                        else:
+                            strength = 'Strong'
+                            color = 'red'
+                        
+                        st.info("**Correlation**: {:.3f} ({} relationship)".format(correlation, strength))
+                    else:
+                        st.info("Correlation could not be calculated (insufficient data variation)")
+                except Exception as e:
+                    st.warning("Could not calculate correlation: {}".format(str(e)))
     
     def render_hospitalization_context_section(self):
         """Render the hospitalization context section."""
@@ -431,14 +440,16 @@ class DashboardLayout:
         col1, col2 = st.columns(2)
         
         with col1:
-            # AQI vs Temperature
+            # AQI vs Temperature with improved error handling
             if 'aqi' in self.data.columns and 'temperature' in self.data.columns:
-                # Clean data for correlation
-                clean_data = self.data[['temperature', 'aqi']].dropna()
+                # Clean data for correlation - remove NaN and infinite values
+                temp_data = self.data[['temperature', 'aqi']].copy()
+                temp_data = temp_data.dropna()
+                temp_data = temp_data[np.isfinite(temp_data['temperature']) & np.isfinite(temp_data['aqi'])]
                 
-                if len(clean_data) > 1:
+                if len(temp_data) > 1:
                     fig = px.scatter(
-                        clean_data,
+                        temp_data,
                         x='temperature',
                         y='aqi',
                         title='🌡️ AQI vs Temperature',
@@ -455,29 +466,32 @@ class DashboardLayout:
                     )
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # Calculate correlation with error handling
+                    # Calculate correlation with robust error handling
                     try:
-                        temp_aqi_corr = clean_data['temperature'].corr(clean_data['aqi'])
-                        if not pd.isna(temp_aqi_corr):
-                            # Classify correlation strength
-                            abs_corr = abs(temp_aqi_corr)
-                            if abs_corr < 0.3:
-                                strength = 'Weak'
-                                color = 'blue'
-                            elif abs_corr < 0.7:
-                                strength = 'Moderate'
-                                color = 'orange'
+                        if len(clean_data) > 2 and clean_data['temperature'].std() > 0 and clean_data['aqi'].std() > 0:
+                            temp_aqi_corr = clean_data['temperature'].corr(clean_data['aqi'])
+                            if not pd.isna(temp_aqi_corr) and np.isfinite(temp_aqi_corr):
+                                # Classify correlation strength
+                                abs_corr = abs(temp_aqi_corr)
+                                if abs_corr < 0.3:
+                                    strength = 'Weak'
+                                    color = 'blue'
+                                elif abs_corr < 0.7:
+                                    strength = 'Moderate'
+                                    color = 'orange'
+                                else:
+                                    strength = 'Strong'
+                                    color = 'red'
+                                
+                                st.markdown(f"""
+                                <div style="padding: 10px; border-left: 4px solid {color}; background-color: #f0f2f6; border-radius: 5px;">
+                                    <strong>Temperature-AQI Correlation:</strong> {temp_aqi_corr:.3f} ({strength})
+                                </div>
+                                """, unsafe_allow_html=True)
                             else:
-                                strength = 'Strong'
-                                color = 'red'
-                            
-                            st.markdown(f"""
-                            <div style="padding: 10px; border-left: 4px solid {color}; background-color: #f0f2f6; border-radius: 5px;">
-                                <strong>Temperature-AQI Correlation:</strong> {temp_aqi_corr:.3f} ({strength})
-                            </div>
-                            """, unsafe_allow_html=True)
+                                st.info("Unable to calculate temperature-AQI correlation (insufficient variation)")
                         else:
-                            st.info("Unable to calculate temperature-AQI correlation")
+                            st.info("Insufficient data variation for correlation calculation")
                     except Exception as e:
                         st.info("Correlation calculation not available")
                 else:
@@ -503,13 +517,15 @@ class DashboardLayout:
                     st.info("Temperature and PM2.5 data not available")
         
         with col2:
-            # AQI vs Wind Speed
+            # AQI vs Wind Speed with improved error handling
             if 'aqi' in self.data.columns and 'wind_speed' in self.data.columns:
-                clean_data = self.data[['wind_speed', 'aqi']].dropna()
+                wind_data = self.data[['wind_speed', 'aqi']].copy()
+                wind_data = wind_data.dropna()
+                wind_data = wind_data[np.isfinite(wind_data['wind_speed']) & np.isfinite(wind_data['aqi'])]
                 
-                if len(clean_data) > 1:
+                if len(wind_data) > 1:
                     fig = px.scatter(
-                        clean_data,
+                        wind_data,
                         x='wind_speed',
                         y='aqi',
                         title='💨 AQI vs Wind Speed',
@@ -526,29 +542,32 @@ class DashboardLayout:
                     )
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # Calculate correlation with error handling
+                    # Calculate correlation with robust error handling
                     try:
-                        wind_aqi_corr = clean_data['wind_speed'].corr(clean_data['aqi'])
-                        if not pd.isna(wind_aqi_corr):
-                            # Classify correlation strength
-                            abs_corr = abs(wind_aqi_corr)
-                            if abs_corr < 0.3:
-                                strength = 'Weak'
-                                color = 'blue'
-                            elif abs_corr < 0.7:
-                                strength = 'Moderate'
-                                color = 'orange'
+                        if len(wind_data) > 2 and wind_data['wind_speed'].std() > 0 and wind_data['aqi'].std() > 0:
+                            wind_aqi_corr = wind_data['wind_speed'].corr(wind_data['aqi'])
+                            if not pd.isna(wind_aqi_corr) and np.isfinite(wind_aqi_corr):
+                                # Classify correlation strength
+                                abs_corr = abs(wind_aqi_corr)
+                                if abs_corr < 0.3:
+                                    strength = 'Weak'
+                                    color = 'blue'
+                                elif abs_corr < 0.7:
+                                    strength = 'Moderate'
+                                    color = 'orange'
+                                else:
+                                    strength = 'Strong'
+                                    color = 'red'
+                                
+                                st.markdown(f"""
+                                <div style="padding: 10px; border-left: 4px solid {color}; background-color: #f0f2f6; border-radius: 5px;">
+                                    <strong>Wind Speed-AQI Correlation:</strong> {wind_aqi_corr:.3f} ({strength})
+                                </div>
+                                """, unsafe_allow_html=True)
                             else:
-                                strength = 'Strong'
-                                color = 'red'
-                            
-                            st.markdown(f"""
-                            <div style="padding: 10px; border-left: 4px solid {color}; background-color: #f0f2f6; border-radius: 5px;">
-                                <strong>Wind Speed-AQI Correlation:</strong> {wind_aqi_corr:.3f} ({strength})
-                            </div>
-                            """, unsafe_allow_html=True)
+                                st.info("Unable to calculate wind speed-AQI correlation (insufficient variation)")
                         else:
-                            st.info("Unable to calculate wind speed-AQI correlation")
+                            st.info("Insufficient data variation for correlation calculation")
                     except Exception as e:
                         st.info("Correlation calculation not available")
                 else:
