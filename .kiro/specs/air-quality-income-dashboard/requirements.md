@@ -64,18 +64,6 @@ The Air Quality vs Middle-Class Income Dashboard is a Streamlit-based web applic
 4. WHEN seasonal patterns are analyzed THEN the Dashboard SHALL incorporate season data from the environmental dataset
 5. WHEN environmental correlations are computed THEN the Dashboard SHALL display statistical significance indicators
 
-### Requirement 5
-
-**User Story:** As an application user, I want transparent mathematical operations and clear disclaimers, so that I understand the limitations and appropriate use of the analysis.
-
-#### Acceptance Criteria
-
-1. WHEN mathematical calculations are performed THEN the Dashboard SHALL delegate all statistical operations to established Python libraries
-2. WHEN the Income Stress Index is calculated THEN the Dashboard SHALL use the formula: stress = (hospital_days × avg_daily_wage) + treatment_cost_est
-3. WHEN statistical summaries are displayed THEN the Dashboard SHALL show Pearson correlation values with strength labels
-4. WHEN the application loads THEN the Dashboard SHALL display prominent disclaimers stating this is for reference use only and makes no medical claims
-5. WHEN data sources are referenced THEN the Dashboard SHALL maintain always-visible source attribution and methodology transparency
-
 ### Requirement 6
 
 **User Story:** As a system administrator, I want the application to handle data processing reliably, so that users receive consistent and reproducible results.
@@ -87,3 +75,4 @@ The Air Quality vs Middle-Class Income Dashboard is a Streamlit-based web applic
 3. WHEN correlation analysis runs THEN the Dashboard SHALL use scipy.stats.pearsonr for statistical calculations
 4. WHEN rolling averages are computed THEN the Dashboard SHALL use pandas.DataFrame.rolling() methods
 5. WHEN the application processes data THEN the Dashboard SHALL produce reproducible results across multiple runs
+** this is my app structure **
