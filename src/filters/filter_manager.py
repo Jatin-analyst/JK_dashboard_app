@@ -367,7 +367,7 @@ class FilterManager:
         # Check sample size requirements
         sample_size_min = filter_params.get('sample_size_min', 0)
         if sample_size_min > current_size:
-            validation_result['warnings'].append(f"Sample size requirement ({sample_size_min}) exceeds available data ({current_size})")
+            validation_result['warnings'].append("Sample size requirement ({}) exceeds available data ({})".format(sample_size_min, current_size))
             validation_result['estimated_retention'] = 0.0
         
         # Check data completeness impact

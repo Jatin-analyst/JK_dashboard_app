@@ -45,23 +45,23 @@ class SidebarFilters:
         # Location multi-select with enhanced help
         locations = self.available_values.get('locations', [])
         if locations:
-            st.sidebar.caption(f"💡 {len(locations)} locations available")
+            st.sidebar.caption("{} locations available".format(len(locations)))
             selected_locations = st.sidebar.multiselect(
                 "Select Locations",
                 options=locations,
                 default=locations,  # All selected by default
-                help=f"""
+                help="""
                 Choose specific cities or regions to analyze.
                 
-                📊 Available locations: {len(locations)}
-                🎯 Tip: Select fewer locations for focused analysis
-                🔄 Use 'Select All' to include all locations
-                """
+                Available locations: {}
+                Tip: Select fewer locations for focused analysis
+                Use 'Select All' to include all locations
+                """.format(len(locations))
             )
             
             # Show selection summary
             if len(selected_locations) != len(locations):
-                st.sidebar.caption(f"🎯 Selected: {len(selected_locations)}/{len(locations)} locations")
+                st.sidebar.caption("Selected: {}/{} locations".format(len(selected_locations), len(locations)))
         else:
             selected_locations = []
             st.sidebar.warning("⚠️ No location data available")
@@ -109,7 +109,7 @@ class SidebarFilters:
         # Season multi-select with enhanced help
         seasons = self.available_values.get('seasons', [])
         if seasons:
-            st.sidebar.caption(f"🌤️ {len(seasons)} seasons available")
+            st.sidebar.caption("{} seasons available".format(len(seasons)))
             selected_seasons = st.sidebar.multiselect(
                 "Seasons",
                 options=seasons,
@@ -326,11 +326,11 @@ class SidebarFilters:
             if hasattr(self, 'filter_manager') and self.filter_manager.filtered_data is not None:
                 current_size = len(self.filter_manager.filtered_data)
                 if current_size < min_sample_size:
-                    st.sidebar.error(f"🚨 Sample size ({min_sample_size}) > available data ({current_size:,})")
+                    st.sidebar.error("Sample size ({}) > available data ({:,})".format(min_sample_size, current_size))
                 elif current_size < min_sample_size * 2:
-                    st.sidebar.warning(f"⚠️ Sample size close to data limit ({current_size:,} available)")
+                    st.sidebar.warning("Sample size close to data limit ({:,} available)".format(current_size))
                 else:
-                    st.sidebar.success(f"✅ Sample size OK ({current_size:,} available)")
+                    st.sidebar.success("Sample size OK ({:,} available)".format(current_size))
             
             # Data completeness requirement with preview
             min_completeness = st.sidebar.slider(
@@ -376,7 +376,7 @@ class SidebarFilters:
                 
                 if validation['warnings']:
                     for warning in validation['warnings']:
-                        st.sidebar.warning(f"⚠️ {warning}")
+                        st.sidebar.warning("{}".format(warning))
             
             return {
                 'sample_size_min': min_sample_size,
@@ -416,11 +416,11 @@ class SidebarFilters:
                 st.session_state.statistical_filters_enabled = False
                 
                 st.sidebar.success("✅ Filters reset!")
-                st.experimental_rerun()
+                st.rerun()
         
         with col2:
             if st.button("📊 Apply", key="apply_filters", help="Apply current filter settings"):
-                st.experimental_rerun()
+                st.rerun()
         
         # Export filtered data button
         if st.sidebar.button("📥 Export Data", key="export_filtered_data", help="Download current filtered dataset"):
@@ -458,7 +458,7 @@ class SidebarFilters:
                 before_size = len(self.filter_manager.get_filtered_dataset())
                 self.filter_manager.apply_location_filter(location_filters)
                 after_size = len(self.filter_manager.get_filtered_dataset())
-                filter_steps.append(f"Location: {before_size} → {after_size} records")
+                filter_steps.append("Location: {} → {} records".format(before_size, after_size))
             
             # Apply demographic filters
             if demographic_filters['age_groups'] or demographic_filters['genders']:
@@ -468,7 +468,7 @@ class SidebarFilters:
                     genders=demographic_filters['genders'] if demographic_filters['genders'] else None
                 )
                 after_size = len(self.filter_manager.get_filtered_dataset())
-                filter_steps.append(f"Demographics: {before_size} → {after_size} records")
+                filter_steps.append("Demographics: {} → {} records".format(before_size, after_size))
             
             # Apply environmental filters
             env_filters_active = any([
@@ -487,7 +487,7 @@ class SidebarFilters:
                     pm25_max=environmental_filters['pm25_max']
                 )
                 after_size = len(self.filter_manager.get_filtered_dataset())
-                filter_steps.append(f"Environmental: {before_size} → {after_size} records")
+                filter_steps.append("Environmental: {} → {} records".format(before_size, after_size))
             
             # Apply temporal filters
             if temporal_filters['start_date'] or temporal_filters['end_date']:
@@ -497,7 +497,7 @@ class SidebarFilters:
                     end_date=temporal_filters['end_date']
                 )
                 after_size = len(self.filter_manager.get_filtered_dataset())
-                filter_steps.append(f"Temporal: {before_size} → {after_size} records")
+                filter_steps.append("Temporal: {} → {} records".format(before_size, after_size))
             
             # Apply threshold filters
             threshold_filters_active = any([
@@ -514,7 +514,7 @@ class SidebarFilters:
                     income_stress_max=threshold_filters['income_stress_max']
                 )
                 after_size = len(self.filter_manager.get_filtered_dataset())
-                filter_steps.append(f"Thresholds: {before_size} → {after_size} records")
+                filter_steps.append("Thresholds: {} → {} records".format(before_size, after_size))
             
             # Apply statistical filters if enabled
             statistical_active = (
@@ -536,12 +536,12 @@ class SidebarFilters:
                         exclude_outliers=statistical_filters['exclude_outliers']
                     )
                     after_size = len(self.filter_manager.get_filtered_dataset())
-                    filter_steps.append(f"Statistical: {before_size} → {after_size} records")
+                    filter_steps.append("Statistical: {} → {} records".format(before_size, after_size))
                     
                     # Add warnings to filter steps if any
                     if validation['warnings']:
                         for warning in validation['warnings']:
-                            filter_steps.append(f"⚠️ {warning}")
+                            filter_steps.append("{}".format(warning))
                 else:
                     filter_steps.append("Statistical: Skipped (would result in empty dataset)")
             
@@ -557,14 +557,14 @@ class SidebarFilters:
             if final_size == 0:
                 st.sidebar.error("⚠️ All data filtered out! Please relax some filters.")
             elif final_size < 10:
-                st.sidebar.warning(f"⚠️ Very small dataset ({final_size} records). Results may be unreliable.")
+                st.sidebar.warning("Very small dataset ({} records). Results may be unreliable.".format(final_size))
             elif final_size / original_size < 0.1:
-                st.sidebar.warning(f"⚠️ Filters removed {((original_size - final_size) / original_size * 100):.1f}% of data.")
+                st.sidebar.warning("Filters removed {:.1f}% of data.".format(((original_size - final_size) / original_size * 100)))
             
             return filtered_data, filter_summary
             
         except Exception as e:
-            st.sidebar.error(f"Error applying filters: {str(e)}")
+            st.sidebar.error("Error applying filters: {}".format(str(e)))
             return data, {'error': str(e), 'original_records': len(data), 'filtered_records': len(data)}
     
     def render_complete_sidebar(self, data):
@@ -626,21 +626,21 @@ class SidebarFilters:
         with col1:
             st.metric(
                 "Records", 
-                f"{filter_summary['filtered_records']:,}",
-                delta=f"-{filter_summary['records_removed']:,}" if filter_summary['records_removed'] > 0 else None
+                "{:,}".format(filter_summary['filtered_records']),
+                delta="-{:,}".format(filter_summary['records_removed']) if filter_summary['records_removed'] > 0 else None
             )
         with col2:
             st.metric(
                 "Retention",
-                f"{filter_summary['retention_rate']:.1%}",
-                delta=f"{filter_summary['active_filters']} filters"
+                "{:.1%}".format(filter_summary['retention_rate']),
+                delta="{} filters".format(filter_summary['active_filters'])
             )
         
         # Show filter steps if available
         if 'filter_steps' in filter_summary and filter_summary['filter_steps']:
             with st.sidebar.expander("🔍 Filter Details", expanded=False):
                 for step in filter_summary['filter_steps']:
-                    st.caption(f"• {step}")
+                    st.caption("• {}".format(step))
         
         # Data quality indicator
         retention_rate = filter_summary['retention_rate']

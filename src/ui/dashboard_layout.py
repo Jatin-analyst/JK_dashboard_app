@@ -145,7 +145,7 @@ class DashboardLayout:
         
         with col_actions:
             if st.button("🔄 Refresh Data", help="Reload the dashboard data"):
-                st.experimental_rerun()
+                st.rerun()
         
         # Colorful metric cards inspired by the dashboard image
         if self.data is not None and len(self.data) > 0:
@@ -155,53 +155,53 @@ class DashboardLayout:
             
             with col1:
                 total_records = len(self.data)
-                st.markdown(f"""
+                st.markdown("""
                 <div class="metric-card metric-card-blue">
-                    <p class="metric-number">{total_records:,}</p>
-                    <p class="metric-label">📊 Records</p>
+                    <p class="metric-number">{:,}</p>
+                    <p class="metric-label">Records</p>
                 </div>
-                """, unsafe_allow_html=True)
+                """.format(total_records), unsafe_allow_html=True)
             
             with col2:
                 unique_locations = self.data['location'].nunique() if 'location' in self.data.columns else 0
-                st.markdown(f"""
+                st.markdown("""
                 <div class="metric-card metric-card-orange">
-                    <p class="metric-number">{unique_locations}</p>
-                    <p class="metric-label">📍 Locations</p>
+                    <p class="metric-number">{}</p>
+                    <p class="metric-label">Locations</p>
                 </div>
-                """, unsafe_allow_html=True)
+                """.format(unique_locations), unsafe_allow_html=True)
             
             with col3:
                 if 'aqi' in self.data.columns:
                     avg_aqi = self.data['aqi'].mean()
-                    st.markdown(f"""
+                    st.markdown("""
                     <div class="metric-card metric-card-green">
-                        <p class="metric-number">{avg_aqi:.0f}</p>
-                        <p class="metric-label">🌫️ Avg AQI</p>
+                        <p class="metric-number">{:.0f}</p>
+                        <p class="metric-label">Avg AQI</p>
                     </div>
-                    """, unsafe_allow_html=True)
+                    """.format(avg_aqi), unsafe_allow_html=True)
                 else:
-                    st.markdown(f"""
+                    st.markdown("""
                     <div class="metric-card metric-card-green">
                         <p class="metric-number">N/A</p>
-                        <p class="metric-label">🌫️ Avg AQI</p>
+                        <p class="metric-label">Avg AQI</p>
                     </div>
                     """, unsafe_allow_html=True)
             
             with col4:
                 if 'respiratory_cases' in self.data.columns:
                     total_cases = self.data['respiratory_cases'].sum()
-                    st.markdown(f"""
+                    st.markdown("""
                     <div class="metric-card metric-card-purple">
-                        <p class="metric-number">{total_cases:,}</p>
-                        <p class="metric-label">🏥 Total Cases</p>
+                        <p class="metric-number">{:,}</p>
+                        <p class="metric-label">Total Cases</p>
                     </div>
-                    """, unsafe_allow_html=True)
+                    """.format(total_cases), unsafe_allow_html=True)
                 else:
-                    st.markdown(f"""
+                    st.markdown("""
                     <div class="metric-card metric-card-purple">
                         <p class="metric-number">N/A</p>
-                        <p class="metric-label">🏥 Total Cases</p>
+                        <p class="metric-label">Total Cases</p>
                     </div>
                     """, unsafe_allow_html=True)
             
@@ -215,7 +215,7 @@ class DashboardLayout:
                         self.data['date'].min().strftime('%Y-%m-%d'),
                         self.data['date'].max().strftime('%Y-%m-%d')
                     )
-                    st.info(f"📅 **Date Range:** {date_range[0]} to {date_range[1]}")
+                    st.info("**Date Range:** {} to {}".format(date_range[0], date_range[1]))
                 else:
                     st.info("📅 **Date Range:** Not available")
             
@@ -223,14 +223,14 @@ class DashboardLayout:
                 if self.filter_summary:
                     retention_rate = self.filter_summary.get('retention_rate', 0)
                     active_filters = self.filter_summary.get('active_filters', 0)
-                    st.info(f"🎛️ **Filters:** {active_filters} active ({retention_rate:.1%} data retained)")
+                    st.info("**Filters:** {} active ({:.1%} data retained)".format(active_filters, retention_rate))
                 else:
                     st.info("🎛️ **Filters:** None active (100% data retained)")
             
             with info_col3:
                 data_quality = "Good" if len(self.data) > 100 else "Limited" if len(self.data) > 10 else "Poor"
                 quality_color = "🟢" if data_quality == "Good" else "🟡" if data_quality == "Limited" else "🔴"
-                st.info(f"{quality_color} **Data Quality:** {data_quality}")
+                st.info("**Data Quality:** {}".format(data_quality))
         
         st.markdown("---")
     
@@ -280,12 +280,12 @@ class DashboardLayout:
             # Update session state when selection changes
             if pollutant_type != st.session_state.selected_pollutant:
                 st.session_state.selected_pollutant = pollutant_type
-                st.experimental_rerun()
+                st.rerun()
         
         with col3:
             # Add refresh button for manual chart updates
             if st.button("🔄 Refresh Chart", key="refresh_hero_chart", help="Manually refresh the chart"):
-                st.experimental_rerun()
+                st.rerun()
         
         with col1:
             # Generate stable cache key for this chart
@@ -297,10 +297,10 @@ class DashboardLayout:
             data_hash = self._generate_data_hash(self.data, chart_params)
             
             # Check if we can use cached chart
-            cache_key = f"hero_chart_{pollutant_type}_{data_hash}"
+            cache_key = "hero_chart_{}_{}" .format(pollutant_type, data_hash)
             
             # Show loading spinner while processing
-            with st.spinner(f"Generating {pollutant_type} analysis..."):
+            with st.spinner("Generating {} analysis...".format(pollutant_type)):
                 # Calculate income stress index if not present (cached)
                 if 'income_stress_index' not in self.data.columns:
                     if all(col in self.data.columns for col in ['hospital_days', 'avg_daily_wage', 'treatment_cost_est']):
@@ -321,7 +321,7 @@ class DashboardLayout:
                     plot_data = self.data.iloc[sample_indices].copy()
                     plot_pollutant = pollutant_data.iloc[sample_indices]
                     plot_income_stress = income_stress.iloc[sample_indices]
-                    st.info(f"📊 Displaying sample of {sample_size:,} points from {len(self.data):,} total records")
+                    st.info("Displaying sample of {:,} points from {:,} total records".format(sample_size, len(self.data)))
                 else:
                     plot_data = self.data
                     plot_pollutant = pollutant_data
@@ -330,7 +330,7 @@ class DashboardLayout:
                 # Create dual-axis chart with improved styling and performance
                 fig = make_subplots(
                     specs=[[{"secondary_y": True}]],
-                    subplot_titles=[f"{pollutant_type} vs Income Stress Analysis"]
+                    subplot_titles=["{} vs Income Stress Analysis".format(pollutant_type)]
                 )
                 
                 # Add pollutant scatter plot with dynamic colors and optimized rendering
@@ -340,7 +340,7 @@ class DashboardLayout:
                         x=plot_data.index,
                         y=plot_pollutant,
                         mode='markers',
-                        name=f"{pollutant_type} Level",
+                        name="{} Level".format(pollutant_type),
                         marker=dict(
                             color=plot_pollutant,
                             colorscale=scatter_color,
@@ -348,11 +348,11 @@ class DashboardLayout:
                             opacity=0.7,
                             line=dict(width=0.5, color='white'),
                             colorbar=dict(
-                                title=f"{pollutant_type}",
+                                title="{}".format(pollutant_type),
                                 titleside="right"
                             )
                         ),
-                        hovertemplate=f"<b>{pollutant_type}</b><br>" +
+                        hovertemplate="<b>{}</b><br>".format(pollutant_type) +
                                     "Value: %{y}<br>" +
                                     "Index: %{x}<br>" +
                                     "<extra></extra>",
@@ -387,7 +387,7 @@ class DashboardLayout:
                     gridcolor='rgba(128,128,128,0.2)'
                 )
                 fig.update_yaxes(
-                    title_text=f"{pollutant_type} Level",
+                    title_text="{} Level".format(pollutant_type),
                     secondary_y=False,
                     showgrid=True,
                     gridwidth=1,
@@ -401,7 +401,7 @@ class DashboardLayout:
                 
                 fig.update_layout(
                     title=dict(
-                        text=f"{pollutant_type} vs Income Stress Relationship",
+                        text="{} vs Income Stress Relationship".format(pollutant_type),
                         x=0.5,
                         font=dict(size=16)
                     ),
@@ -458,18 +458,18 @@ class DashboardLayout:
                                 emoji = '🔴'
                             
                             # Enhanced correlation display with sample size info
-                            st.markdown(f"""
-                            <div style="padding: 15px; border-left: 4px solid {color}; background-color: #f8f9fa; border-radius: 8px; margin: 10px 0;">
-                                <h4 style="color: {color}; margin: 0 0 8px 0;">{emoji} Correlation Analysis</h4>
-                                <p style="margin: 0 0 5px 0; font-size: 1.1em;"><strong>{pollutant_type} vs Income Stress:</strong> {correlation:.3f}</p>
-                                <p style="margin: 0 0 5px 0; color: {color}; font-weight: bold;">Strength: {strength}</p>
-                                <small style="color: #666;">Based on {len(plot_pollutant):,} data points</small>
+                            st.markdown("""
+                            <div style="padding: 15px; border-left: 4px solid {}; background-color: #f8f9fa; border-radius: 8px; margin: 10px 0;">
+                                <h4 style="color: {}; margin: 0 0 8px 0;">{} Correlation Analysis</h4>
+                                <p style="margin: 0 0 5px 0; font-size: 1.1em;"><strong>{} vs Income Stress:</strong> {:.3f}</p>
+                                <p style="margin: 0 0 5px 0; color: {}; font-weight: bold;">Strength: {}</p>
+                                <small style="color: #666;">Based on {:,} data points</small>
                             </div>
-                            """, unsafe_allow_html=True)
+                            """.format(color, color, emoji, pollutant_type, correlation, color, strength, len(plot_pollutant)), unsafe_allow_html=True)
                         else:
                             st.info("⚠️ Correlation could not be calculated (insufficient data variation)")
                     except Exception as e:
-                        st.warning(f"⚠️ Could not calculate correlation: {str(e)}")
+                        st.warning("Could not calculate correlation: {}".format(str(e)))
                 else:
                     st.info("⚠️ Insufficient data points for correlation analysis")
     
@@ -659,20 +659,20 @@ class DashboardLayout:
                                     color = '#e74c3c'
                                     emoji = '🔴'
                                 
-                                st.markdown(f"""
-                                <div style="padding: 12px; border-left: 4px solid {color}; background-color: #f8f9fa; border-radius: 8px; margin: 10px 0;">
-                                    <h5 style="color: {color}; margin: 0 0 5px 0;">{emoji} Temperature-AQI Correlation</h5>
-                                    <p style="margin: 0; font-size: 1.1em;"><strong>Correlation:</strong> {temp_aqi_corr:.3f}</p>
-                                    <p style="margin: 0; color: {color}; font-weight: bold;">Strength: {strength}</p>
-                                    <small style="color: #666;">Based on {len(temp_data)} data points</small>
+                                st.markdown("""
+                                <div style="padding: 12px; border-left: 4px solid {}; background-color: #f8f9fa; border-radius: 8px; margin: 10px 0;">
+                                    <h5 style="color: {}; margin: 0 0 5px 0;">{} Temperature-AQI Correlation</h5>
+                                    <p style="margin: 0; font-size: 1.1em;"><strong>Correlation:</strong> {:.3f}</p>
+                                    <p style="margin: 0; color: {}; font-weight: bold;">Strength: {}</p>
+                                    <small style="color: #666;">Based on {} data points</small>
                                 </div>
-                                """, unsafe_allow_html=True)
+                                """.format(color, color, emoji, temp_aqi_corr, color, strength, len(temp_data)), unsafe_allow_html=True)
                             else:
                                 st.info("💡 Unable to calculate temperature-AQI correlation (insufficient variation)")
                         else:
                             st.info("💡 Insufficient data variation for correlation calculation")
                     except Exception as e:
-                        st.warning(f"⚠️ Correlation calculation error: {str(e)}")
+                        st.warning("Correlation calculation error: {}".format(str(e)))
                 else:
                     st.info("Insufficient data points for temperature-AQI analysis")
             else:
@@ -741,20 +741,20 @@ class DashboardLayout:
                                     color = '#e74c3c'
                                     emoji = '🔴'
                                 
-                                st.markdown(f"""
-                                <div style="padding: 12px; border-left: 4px solid {color}; background-color: #f8f9fa; border-radius: 8px; margin: 10px 0;">
-                                    <h5 style="color: {color}; margin: 0 0 5px 0;">{emoji} Wind Speed-AQI Correlation</h5>
-                                    <p style="margin: 0; font-size: 1.1em;"><strong>Correlation:</strong> {wind_aqi_corr:.3f}</p>
-                                    <p style="margin: 0; color: {color}; font-weight: bold;">Strength: {strength}</p>
-                                    <small style="color: #666;">Based on {len(wind_data)} data points</small>
+                                st.markdown("""
+                                <div style="padding: 12px; border-left: 4px solid {}; background-color: #f8f9fa; border-radius: 8px; margin: 10px 0;">
+                                    <h5 style="color: {}; margin: 0 0 5px 0;">{} Wind Speed-AQI Correlation</h5>
+                                    <p style="margin: 0; font-size: 1.1em;"><strong>Correlation:</strong> {:.3f}</p>
+                                    <p style="margin: 0; color: {}; font-weight: bold;">Strength: {}</p>
+                                    <small style="color: #666;">Based on {} data points</small>
                                 </div>
-                                """, unsafe_allow_html=True)
+                                """.format(color, color, emoji, wind_aqi_corr, color, strength, len(wind_data)), unsafe_allow_html=True)
                             else:
                                 st.info("💡 Unable to calculate wind speed-AQI correlation (insufficient variation)")
                         else:
                             st.info("💡 Insufficient data variation for correlation calculation")
                     except Exception as e:
-                        st.warning(f"⚠️ Correlation calculation error: {str(e)}")
+                        st.warning("Correlation calculation error: {}".format(str(e)))
                 else:
                     st.info("Insufficient data points for wind speed-AQI analysis")
             else:
@@ -986,13 +986,13 @@ class DashboardLayout:
                             color = "#3498db"
                         
                         with col:
-                            st.markdown(f"""
-                            <div style="padding: 15px; border: 2px solid {color}; border-radius: 10px; text-align: center; background-color: #f8f9fa;">
-                                <h4 style="color: {color}; margin: 0;">{corr['correlation']:.3f}</h4>
-                                <p style="margin: 5px 0; font-weight: bold;">{corr['var1']} ↔ {corr['var2']}</p>
-                                <p style="margin: 0; color: {color}; font-size: 0.9em;">{strength} Correlation</p>
+                            st.markdown("""
+                            <div style="padding: 15px; border: 2px solid {}; border-radius: 10px; text-align: center; background-color: #f8f9fa;">
+                                <h4 style="color: {}; margin: 0;">{:.3f}</h4>
+                                <p style="margin: 5px 0; font-weight: bold;">{} ↔ {}</p>
+                                <p style="margin: 0; color: {}; font-size: 0.9em;">{} Correlation</p>
                             </div>
-                            """, unsafe_allow_html=True)
+                            """.format(color, color, corr['correlation'], corr['var1'], corr['var2'], color, strength), unsafe_allow_html=True)
                 else:
                     st.info("Insufficient clean data for correlation analysis")
             else:
@@ -1071,16 +1071,16 @@ class DashboardLayout:
                     perf_col1, perf_col2 = st.columns(2)
                     
                     with perf_col1:
-                        st.metric("Total Render Time", f"{total_time:.2f}s")
-                        st.metric("Header Time", f"{header_time:.2f}s")
+                        st.metric("Total Render Time", "{:.2f}s".format(total_time))
+                        st.metric("Header Time", "{:.2f}s".format(header_time))
                     
                     with perf_col2:
-                        st.metric("Data Size", f"{len(self.data):,} rows")
-                        st.metric("Memory Usage", f"{self.data.memory_usage(deep=True).sum() / 1024 / 1024:.1f} MB")
+                        st.metric("Data Size", "{:,} rows".format(len(self.data)))
+                        st.metric("Memory Usage", "{:.1f} MB".format(self.data.memory_usage(deep=True).sum() / 1024 / 1024))
                     
                     st.subheader("Section Render Times")
                     for section, render_time in section_times.items():
-                        st.text(f"{section}: {render_time:.2f}s")
+                        st.text("{}: {:.2f}s".format(section, render_time))
         else:
             st.error("No data available. Please check your data source and filters.")
         

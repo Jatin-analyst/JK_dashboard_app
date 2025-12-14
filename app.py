@@ -217,13 +217,13 @@ def main():
             filtered_count = filter_summary.get('filtered_records', 0)
             
             if retention_rate < 0.01:  # Less than 1% data retained
-                st.error(f"🚨 Filters are extremely restrictive ({retention_rate:.2%} data retained, {filtered_count:,} records). Please reset or relax filters.")
+                st.error("Filters are extremely restrictive ({:.2%} data retained, {:,} records). Please reset or relax filters.".format(retention_rate, filtered_count))
             elif retention_rate < 0.1:  # Less than 10% data retained
-                st.warning(f"⚠️ Current filters are very restrictive ({retention_rate:.1%} data retained, {filtered_count:,} records). Consider relaxing some filters for better analysis.")
+                st.warning("Current filters are very restrictive ({:.1%} data retained, {:,} records). Consider relaxing some filters for better analysis.".format(retention_rate, filtered_count))
             elif retention_rate < 0.5:  # Less than 50% data retained
-                st.info(f"ℹ️ Filters have significantly reduced the dataset ({retention_rate:.1%} retained, {filtered_count:,} records). Results may be limited.")
+                st.info("Filters have significantly reduced the dataset ({:.1%} retained, {:,} records). Results may be limited.".format(retention_rate, filtered_count))
             else:
-                st.success(f"✅ Filters applied successfully! Showing {filtered_count:,} records ({retention_rate:.1%} of original data).")
+                st.success("Filters applied successfully! Showing {:,} records ({:.1%} of original data).".format(filtered_count, retention_rate))
         
         filter_progress.progress(100)
         
@@ -234,8 +234,8 @@ def main():
         filter_status.empty()
                 
     except Exception as e:
-        st.error(f"❌ Error creating filters: {str(e)}")
-        st.info("🔄 Using original dataset without filters.")
+        st.error("Error creating filters: {}".format(str(e)))
+        st.info("Using original dataset without filters.")
         filtered_data = data
         filter_summary = {'error': str(e), 'filtered_records': len(data), 'retention_rate': 1.0}
     
@@ -259,7 +259,7 @@ def main():
             except ImportError:
                 st.info("💡 Data quality analysis module not available")
             except Exception as e:
-                st.warning(f"⚠️ Data quality analysis failed: {str(e)}")
+                st.warning("Data quality analysis failed: {}".format(str(e)))
             
             dashboard_progress.progress(50)
             dashboard_status.text("🎨 Rendering dashboard components...")
@@ -280,7 +280,7 @@ def main():
             with perf_col1:
                 st.metric(
                     "Dataset Size",
-                    f"{len(filtered_data):,}",
+                    "{:,}".format(len(filtered_data)),
                     help="Number of records currently displayed"
                 )
             
@@ -288,7 +288,7 @@ def main():
                 memory_usage = filtered_data.memory_usage(deep=True).sum() / 1024 / 1024
                 st.metric(
                     "Memory Usage",
-                    f"{memory_usage:.1f} MB",
+                    "{:.1f} MB".format(memory_usage),
                     help="Current memory consumption"
                 )
             
@@ -336,21 +336,21 @@ def main():
                     for key in list(st.session_state.keys()):
                         if 'filter' in key.lower() or 'selected' in key.lower():
                             del st.session_state[key]
-                    st.experimental_rerun()
+                    st.rerun()
             
             # Show filter summary if available
             if filter_summary and 'filter_steps' in filter_summary:
                 with st.expander("🔍 Filter Application Steps", expanded=True):
                     for step in filter_summary['filter_steps']:
-                        st.text(f"• {step}")
+                        st.text("• {}".format(step))
             
     except Exception as e:
-        st.error(f"❌ Error rendering dashboard: {str(e)}")
+        st.error("Error rendering dashboard: {}".format(str(e)))
         
         # Enhanced fallback with better error reporting
         with st.expander("🔧 Technical Details", expanded=False):
-            st.code(f"Error: {str(e)}")
-            st.code(f"Error type: {type(e).__name__}")
+            st.code("Error: {}".format(str(e)))
+            st.code("Error type: {}".format(type(e).__name__))
         
         st.info("🔄 Attempting fallback display...")
         
@@ -364,7 +364,7 @@ def main():
         if filtered_data is not None and len(filtered_data) > 0:
             try:
                 st.subheader("📋 Data Overview")
-                st.info(f"Dataset shape: {filtered_data.shape[0]:,} rows, {filtered_data.shape[1]} columns")
+                st.info("Dataset shape: {:,} rows, {} columns".format(filtered_data.shape[0], filtered_data.shape[1]))
                 
                 # Safe data display
                 display_data = prepare_data_for_streamlit(filtered_data.head(10))
@@ -379,10 +379,10 @@ def main():
                     else:
                         st.info("No numeric columns available for statistics")
                 except Exception as stats_error:
-                    st.warning(f"Statistics calculation failed: {str(stats_error)}")
+                    st.warning("Statistics calculation failed: {}".format(str(stats_error)))
                     
             except Exception as fallback_error:
-                st.error(f"Fallback display also failed: {str(fallback_error)}")
+                st.error("Fallback display also failed: {}".format(str(fallback_error)))
         else:
             st.error("❌ No data available for display")
 
