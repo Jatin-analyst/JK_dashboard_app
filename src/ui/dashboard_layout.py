@@ -423,6 +423,12 @@ class DashboardLayout:
     
     def render_environmental_context_section(self):
         """Render the environmental context section."""
+        # Check for statsmodels availability for trendlines
+        try:
+            import statsmodels.api as sm
+            trendline_available = True
+        except ImportError:
+            trendline_available = False
         st.subheader("🌡️ Environmental Context")
         
         if self.data is None or len(self.data) == 0:
@@ -456,7 +462,7 @@ class DashboardLayout:
                         labels={'temperature': 'Temperature (°C)', 'aqi': 'Air Quality Index'},
                         color='aqi',
                         color_continuous_scale='Reds',
-                        trendline='ols'
+                        trendline='ols' if trendline_available else None
                     )
                     fig.update_layout(
                         height=400,
@@ -509,7 +515,7 @@ class DashboardLayout:
                             labels={'pm25': 'PM2.5 (μg/m³)', 'aqi': 'Air Quality Index'},
                             color='aqi',
                             color_continuous_scale='Reds',
-                            trendline='ols'
+                            trendline='ols' if trendline_available else None
                         )
                         fig.update_layout(height=400, showlegend=False)
                         st.plotly_chart(fig, use_container_width=True)
@@ -532,7 +538,7 @@ class DashboardLayout:
                         labels={'wind_speed': 'Wind Speed (m/s)', 'aqi': 'Air Quality Index'},
                         color='aqi',
                         color_continuous_scale='Blues',
-                        trendline='ols'
+                        trendline='ols' if trendline_available else None
                     )
                     fig.update_layout(
                         height=400,

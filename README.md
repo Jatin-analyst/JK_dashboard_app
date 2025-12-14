@@ -63,6 +63,69 @@ A comprehensive Streamlit dashboard for exploratory analysis of relationships be
 5. **Open in browser**
    Navigate to `http://localhost:8501`
 
+## 🚀 Deployment Options
+
+### 🐳 Docker Deployment (Recommended)
+
+#### Using Docker Compose
+```bash
+# Build and run
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop
+docker-compose down
+```
+
+#### Using Docker directly
+```bash
+# Build image
+docker build -t air-quality-dashboard .
+
+# Run container
+docker run -p 8501:8501 air-quality-dashboard
+```
+
+### ☁️ Cloud Deployment
+
+#### Streamlit Cloud
+1. Fork this repository to your GitHub account
+2. Go to [Streamlit Cloud](https://streamlit.io/cloud)
+3. Connect your GitHub repository
+4. Deploy with one click
+5. Add any secrets via the Streamlit Cloud interface
+
+#### Other Cloud Platforms
+- **Heroku**: Use the included `Dockerfile` for container deployment
+- **Railway**: Connect GitHub repository directly
+- **Render**: Deploy from GitHub with automatic builds
+- **AWS/GCP/Azure**: Use container services (ECS, Cloud Run, Container Instances)
+
+### 🔧 Production Configuration
+
+#### Environment Variables
+```bash
+STREAMLIT_SERVER_HEADLESS=true
+STREAMLIT_SERVER_ENABLE_CORS=false
+STREAMLIT_SERVER_PORT=8501
+STREAMLIT_SERVER_ADDRESS=0.0.0.0
+```
+
+#### Production Requirements
+Use `requirements-prod.txt` for production deployments:
+```bash
+pip install -r requirements-prod.txt
+```
+
+#### Streamlit Configuration
+Customize `.streamlit/config.toml` for production settings:
+- Theme colors and fonts
+- Server configuration
+- Security settings
+- Performance optimizations
+
 ## 📁 Project Structure
 
 ```

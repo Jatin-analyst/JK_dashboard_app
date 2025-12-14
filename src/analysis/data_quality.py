@@ -7,6 +7,21 @@ import numpy as np
 import streamlit as st
 
 
+def prepare_data_for_streamlit(df):
+    """Prepare DataFrame for Streamlit display by fixing conversion issues."""
+    if df is None or len(df) == 0:
+        return df
+    
+    display_df = df.copy()
+    
+    # Fix datetime columns
+    for col in display_df.columns:
+        if pd.api.types.is_datetime64_any_dtype(display_df[col]):
+            display_df[col] = display_df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+    
+    return display_df
+
+
 class DataQualityValidator:
     """
     Validates data quality and generates quality reports.
@@ -295,7 +310,7 @@ class DataQualityValidator:
                     {'Column': col, 'Completeness': '{:.1%}'.format(comp)}
                     for col, comp in completeness_data.items()
                 ])
-                st.dataframe(completeness_df, use_container_width=True)
+                st.dataframe(prepare_data_for_streamlit(completeness_df), use_container_width=True)
             
             # Duplicate information
             duplicate_info = validation_results.get('quality_metrics', {}).get('duplicates', {})
@@ -321,7 +336,7 @@ class DataQualityValidator:
                 
                 if outlier_data:
                     outlier_df = pd.DataFrame(outlier_data)
-                    st.dataframe(outlier_df, use_container_width=True)
+                    st.dataframe(prepare_data_for_streamlit(outlier_df), use_container_width=True)
                 else:
                     st.success("No significant outliers detected")
     

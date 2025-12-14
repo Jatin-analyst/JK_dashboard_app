@@ -26,6 +26,38 @@ except ImportError as e:
     st.stop()
 
 
+def prepare_data_for_streamlit(df):
+    """
+    Prepare DataFrame for Streamlit display by fixing common conversion issues.
+    
+    Args:
+        df: pandas DataFrame
+        
+    Returns:
+        DataFrame safe for Streamlit display
+    """
+    if df is None or len(df) == 0:
+        return df
+    
+    display_df = df.copy()
+    
+    # Fix datetime columns that cause PyArrow conversion issues
+    for col in display_df.columns:
+        if pd.api.types.is_datetime64_any_dtype(display_df[col]):
+            # Convert datetime to string for display
+            display_df[col] = display_df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+        elif display_df[col].dtype == 'object':
+            # Handle mixed types in object columns
+            try:
+                # Try to convert timestamps in object columns
+                if display_df[col].astype(str).str.contains('Timestamp').any():
+                    display_df[col] = pd.to_datetime(display_df[col], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
+            except:
+                pass
+    
+    return display_df
+
+
 @st.cache_data(show_spinner=True, ttl=3600)  # Cache for 1 hour
 def load_data():
     """Load and cache the real dataset with performance optimization."""
@@ -71,6 +103,15 @@ def optimize_data_types(df):
     return optimized_df
 
 
+def health_check():
+    """Health check endpoint for deployment monitoring"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "version": "1.0.0"
+    }
+
+
 def main():
     """Main application entry point"""
     st.set_page_config(
@@ -94,7 +135,7 @@ def main():
         }
     )
     
-    # Add custom CSS for better UI
+    # Add custom CSS for better UI and production optimization
     st.markdown("""
     <style>
     .main > div {
@@ -114,6 +155,17 @@ def main():
     .sidebar .sidebar-content {
         background-color: #f8f9fa;
     }
+    /* Production optimizations */
+    .stSpinner {
+        text-align: center;
+    }
+    .stProgress .st-bo {
+        background-color: #ff6b6b;
+    }
+    /* Hide Streamlit branding in production */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
     
@@ -216,7 +268,10 @@ def main():
         if filtered_data is not None and len(filtered_data) > 0:
             st.subheader("Data Overview")
             st.write("Dataset shape: {} rows, {} columns".format(*filtered_data.shape))
-            st.dataframe(filtered_data.head())
+            
+            # Fix timestamp conversion issue for display
+            display_data = prepare_data_for_streamlit(filtered_data.head())
+            st.dataframe(display_data)
             
             # Basic statistics
             st.subheader("Basic Statistics")
