@@ -415,8 +415,7 @@ class DashboardLayout:
                         x=1
                     ),
                     # Performance optimizations
-                    dragmode='pan',
-                    selectdirection='diagonal'
+                    dragmode='pan'
                 )
                 
                 # Render chart with optimized key

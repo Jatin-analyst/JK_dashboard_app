@@ -1,110 +1,133 @@
 # -*- coding: utf-8 -*-
 """
-Air Quality vs Middle-Class Income Dashboard
+Air Quality vs Middle-Class Income Dashboard - DEPLOYMENT READY VERSION
 
 A Streamlit application for exploratory analysis of relationships between 
 air quality indicators, respiratory hospitalization burden, and economic stress indicators.
+
+This version includes comprehensive error handling for Streamlit Cloud deployment.
 """
 
 import streamlit as st
 import pandas as pd
 import numpy as np
-from datetime import datetime
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from datetime import datetime, date
 import sys
 import os
 
 # Add src directory to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
-# Import our custom modules
-try:
-    from data.real_data_processor import RealDataProcessor
-    from ui.sidebar_filters import create_sidebar_filters
-    from ui.dashboard_layout import create_dashboard_layout
-except ImportError as e:
-    st.error("Error importing modules: {}. Please ensure all dependencies are installed.".format(str(e)))
-    st.stop()
-
-
-def prepare_data_for_streamlit(df):
-    """
-    Prepare DataFrame for Streamlit display by fixing common conversion issues.
-    
-    Args:
-        df: pandas DataFrame
-        
-    Returns:
-        DataFrame safe for Streamlit display
-    """
-    if df is None or len(df) == 0:
-        return df
-    
-    display_df = df.copy()
-    
-    # Fix datetime columns that cause PyArrow conversion issues
-    for col in display_df.columns:
-        if pd.api.types.is_datetime64_any_dtype(display_df[col]):
-            # Convert datetime to string for display
-            display_df[col] = display_df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
-        elif display_df[col].dtype == 'object':
-            # Handle mixed types in object columns
-            try:
-                # Try to convert timestamps in object columns
-                if display_df[col].astype(str).str.contains('Timestamp').any():
-                    display_df[col] = pd.to_datetime(display_df[col], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
-            except:
-                pass
-    
-    return display_df
-
+def safe_import():
+    """Safely import custom modules with error handling."""
+    try:
+        from data.real_data_processor import RealDataProcessor
+        from ui.sidebar_filters import create_sidebar_filters
+        from ui.dashboard_layout import create_dashboard_layout
+        return True, RealDataProcessor, create_sidebar_filters, create_dashboard_layout
+    except ImportError as e:
+        st.error("Error importing modules: {}. Please ensure all dependencies are installed.".format(str(e)))
+        return False, None, None, None
 
 @st.cache_data(show_spinner=True, ttl=3600)  # Cache for 1 hour
-def load_data():
-    """Load and cache the real dataset with performance optimization."""
+def load_data_safe():
+    """Load and cache the real dataset with comprehensive error handling."""
     try:
+        success, RealDataProcessor, _, _ = safe_import()
+        if not success:
+            return None, None
+            
         with st.spinner("Loading and processing air quality data..."):
             processor = RealDataProcessor()
             merged_data = processor.create_comprehensive_dataset()
             
+            if merged_data is None or len(merged_data) == 0:
+                st.error("No data could be loaded. Please check data files.")
+                return None, None
+            
             # Optimize data types for better performance
-            merged_data = optimize_data_types(merged_data)
+            merged_data = optimize_data_types_safe(merged_data)
             
         return merged_data, processor
     except Exception as e:
         st.error("Error loading data: {}".format(str(e)))
         return None, None
 
-
-def optimize_data_types(df):
-    """Optimize DataFrame data types for better performance."""
-    optimized_df = df.copy()
-    
-    # Convert float64 to float32 where appropriate
-    float_cols = optimized_df.select_dtypes(include=['float64']).columns
-    for col in float_cols:
-        if optimized_df[col].max() < 1e6:  # Safe range for float32
-            optimized_df[col] = optimized_df[col].astype('float32')
-    
-    # Convert int64 to smaller int types where appropriate
-    int_cols = optimized_df.select_dtypes(include=['int64']).columns
-    for col in int_cols:
-        col_max = optimized_df[col].max()
-        col_min = optimized_df[col].min()
+def optimize_data_types_safe(df):
+    """Safely optimize DataFrame data types for better performance."""
+    try:
+        optimized_df = df.copy()
         
-        if col_min >= 0 and col_max <= 255:
-            optimized_df[col] = optimized_df[col].astype('uint8')
-        elif col_min >= -128 and col_max <= 127:
-            optimized_df[col] = optimized_df[col].astype('int8')
-        elif col_min >= 0 and col_max <= 65535:
-            optimized_df[col] = optimized_df[col].astype('uint16')
-        elif col_min >= -32768 and col_max <= 32767:
-            optimized_df[col] = optimized_df[col].astype('int16')
-    
-    return optimized_df
+        # Convert float64 to float32 where appropriate
+        float_cols = optimized_df.select_dtypes(include=['float64']).columns
+        for col in float_cols:
+            try:
+                if optimized_df[col].max() < 1e6:  # Safe range for float32
+                    optimized_df[col] = optimized_df[col].astype('float32')
+            except:
+                continue
+        
+        # Convert int64 to smaller int types where appropriate
+        int_cols = optimized_df.select_dtypes(include=['int64']).columns
+        for col in int_cols:
+            try:
+                col_max = optimized_df[col].max()
+                col_min = optimized_df[col].min()
+                
+                if col_min >= 0 and col_max <= 255:
+                    optimized_df[col] = optimized_df[col].astype('uint8')
+                elif col_min >= -128 and col_max <= 127:
+                    optimized_df[col] = optimized_df[col].astype('int8')
+                elif col_min >= 0 and col_max <= 65535:
+                    optimized_df[col] = optimized_df[col].astype('uint16')
+                elif col_min >= -32768 and col_max <= 32767:
+                    optimized_df[col] = optimized_df[col].astype('int16')
+            except:
+                continue
+        
+        return optimized_df
+    except Exception as e:
+        st.warning("Data optimization failed: {}".format(str(e)))
+        return df
 
+def create_fallback_dashboard(data):
+    """Create a simple fallback dashboard when main dashboard fails."""
+    st.title("🌬️ Air Quality Dashboard (Fallback Mode)")
+    
+    st.warning("""
+    **⚠️ DISCLAIMER**: This dashboard is for reference and exploratory analysis only. 
+    It makes no medical claims or predictions.
+    """)
+    
+    if data is not None and len(data) > 0:
+        st.subheader("📋 Data Overview")
+        st.info("Dataset shape: {:,} rows, {} columns".format(data.shape[0], data.shape[1]))
+        
+        # Safe data display
+        try:
+            display_data = data.head(10)
+            st.dataframe(display_data, use_container_width=True)
+        except Exception as e:
+            st.error("Could not display data: {}".format(str(e)))
+        
+        # Basic statistics
+        st.subheader("📊 Basic Statistics")
+        try:
+            numeric_data = data.select_dtypes(include=[np.number])
+            if len(numeric_data.columns) > 0:
+                st.dataframe(numeric_data.describe(), use_container_width=True)
+            else:
+                st.info("No numeric columns available for statistics")
+        except Exception as e:
+            st.warning("Statistics calculation failed: {}".format(str(e)))
+    else:
+        st.error("❌ No data available for display")
 
 def main():
-    """Main application entry point"""
+    """Main application entry point with comprehensive error handling."""
     st.set_page_config(
         page_title="Air Quality vs Income Dashboard",
         page_icon="🌬️",
@@ -126,7 +149,7 @@ def main():
         }
     )
     
-    # Add custom CSS for better UI and production optimization
+    # Add custom CSS for better UI
     st.markdown("""
     <style>
     .main > div {
@@ -146,29 +169,26 @@ def main():
     .sidebar .sidebar-content {
         background-color: #f8f9fa;
     }
-    /* Production optimizations */
     .stSpinner {
         text-align: center;
     }
     .stProgress .st-bo {
         background-color: #ff6b6b;
     }
-    /* Hide Streamlit branding in production */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
     
-    # Add progress tracking
+    # Load data with progress tracking
     progress_bar = st.progress(0)
     status_text = st.empty()
     
-    # Load data with progress updates
     status_text.text("Initializing data loader...")
     progress_bar.progress(10)
     
-    data, processor = load_data()
+    data, processor = load_data_safe()
     progress_bar.progress(50)
     
     if data is not None:
@@ -196,8 +216,13 @@ def main():
         """)
         return
     
-    # Create sidebar filters and get filtered data with improved error handling
+    # Try to create sidebar filters with comprehensive error handling
     try:
+        success, _, create_sidebar_filters, create_dashboard_layout = safe_import()
+        if not success:
+            create_fallback_dashboard(data)
+            return
+            
         # Show filter application progress
         filter_progress = st.progress(0)
         filter_status = st.empty()
@@ -211,7 +236,7 @@ def main():
         filter_progress.progress(75)
         filter_status.text("✅ Filters applied successfully!")
         
-        # Show filter performance info with enhanced feedback
+        # Show filter performance info
         if filter_summary and 'error' not in filter_summary:
             retention_rate = filter_summary.get('retention_rate', 1.0)
             filtered_count = filter_summary.get('filtered_records', 0)
@@ -237,26 +262,19 @@ def main():
         st.error("Error creating filters: {}".format(str(e)))
         st.info("Using original dataset without filters.")
         filtered_data = data
-        filter_summary = {
-            'error': str(e), 
-            'filtered_records': len(data), 
-            'retention_rate': 1.0,
-            'records_removed': 0,
-            'active_filters': 0,
-            'filter_details': {}
-        }
+        filter_summary = {'error': str(e), 'filtered_records': len(data), 'retention_rate': 1.0}
     
-    # Render main dashboard with enhanced error handling and loading states
+    # Render main dashboard with comprehensive error handling
     try:
         if filtered_data is not None and len(filtered_data) > 0:
             # Show dashboard loading progress
             dashboard_progress = st.progress(0)
             dashboard_status = st.empty()
             
-            dashboard_status.text("📊 Preparing data quality analysis...")
+            dashboard_status.text("📊 Preparing dashboard...")
             dashboard_progress.progress(20)
             
-            # Add data quality check with error handling
+            # Try to add data quality check
             try:
                 from analysis.data_quality import validate_dashboard_data
                 
@@ -273,12 +291,16 @@ def main():
             
             # Render main dashboard with loading feedback
             with st.spinner("Generating visualizations..."):
-                create_dashboard_layout(filtered_data, filter_summary)
+                try:
+                    create_dashboard_layout(filtered_data, filter_summary)
+                except Exception as e:
+                    st.error("Main dashboard failed: {}. Switching to fallback mode.".format(str(e)))
+                    create_fallback_dashboard(filtered_data)
             
             dashboard_progress.progress(90)
             dashboard_status.text("✅ Dashboard ready!")
             
-            # Add enhanced performance footer
+            # Add performance footer
             st.markdown("---")
             st.subheader("📊 Dashboard Performance")
             
@@ -292,12 +314,15 @@ def main():
                 )
             
             with perf_col2:
-                memory_usage = filtered_data.memory_usage(deep=True).sum() / 1024 / 1024
-                st.metric(
-                    "Memory Usage",
-                    "{:.1f} MB".format(memory_usage),
-                    help="Current memory consumption"
-                )
+                try:
+                    memory_usage = filtered_data.memory_usage(deep=True).sum() / 1024 / 1024
+                    st.metric(
+                        "Memory Usage",
+                        "{:.1f} MB".format(memory_usage),
+                        help="Current memory consumption"
+                    )
+                except:
+                    st.metric("Memory Usage", "N/A", help="Could not calculate memory usage")
             
             with perf_col3:
                 columns_count = len(filtered_data.columns)
@@ -352,47 +377,15 @@ def main():
                         st.text("• {}".format(step))
             
     except Exception as e:
-        st.error("Error rendering dashboard: {}".format(str(e)))
+        st.error("Critical error rendering dashboard: {}".format(str(e)))
         
-        # Enhanced fallback with better error reporting
+        # Ultimate fallback
         with st.expander("🔧 Technical Details", expanded=False):
             st.code("Error: {}".format(str(e)))
             st.code("Error type: {}".format(type(e).__name__))
         
         st.info("🔄 Attempting fallback display...")
-        
-        # Fallback: basic data display with error handling
-        st.title("🌬️ Air Quality vs Middle-Class Income Dashboard")
-        st.warning("""
-        **⚠️ DISCLAIMER**: This dashboard is for reference and exploratory analysis only. 
-        It makes no medical claims or predictions.
-        """)
-        
-        if filtered_data is not None and len(filtered_data) > 0:
-            try:
-                st.subheader("📋 Data Overview")
-                st.info("Dataset shape: {:,} rows, {} columns".format(filtered_data.shape[0], filtered_data.shape[1]))
-                
-                # Safe data display
-                display_data = prepare_data_for_streamlit(filtered_data.head(10))
-                st.dataframe(display_data, use_container_width=True)
-                
-                # Basic statistics with error handling
-                st.subheader("📊 Basic Statistics")
-                try:
-                    numeric_data = filtered_data.select_dtypes(include=[np.number])
-                    if len(numeric_data.columns) > 0:
-                        st.dataframe(numeric_data.describe(), use_container_width=True)
-                    else:
-                        st.info("No numeric columns available for statistics")
-                except Exception as stats_error:
-                    st.warning("Statistics calculation failed: {}".format(str(stats_error)))
-                    
-            except Exception as fallback_error:
-                st.error("Fallback display also failed: {}".format(str(fallback_error)))
-        else:
-            st.error("❌ No data available for display")
-
+        create_fallback_dashboard(filtered_data if 'filtered_data' in locals() else data)
 
 if __name__ == "__main__":
     main()
