@@ -23,8 +23,12 @@ class FilterManager:
     
     def set_data(self, data):
         """Set the original dataset for filtering."""
-        self.original_data = data.copy()
-        self.filtered_data = data.copy()
+        if data is None or len(data) == 0:
+            self.original_data = pd.DataFrame()
+            self.filtered_data = pd.DataFrame()
+        else:
+            self.original_data = data.copy()
+            self.filtered_data = data.copy()
         return self
     
     def apply_location_filter(self, locations=None):
@@ -134,6 +138,10 @@ class FilterManager:
         if start_date is not None:
             if isinstance(start_date, str):
                 start_date = pd.to_datetime(start_date)
+            elif hasattr(start_date, 'date'):
+                # Convert date object to datetime for comparison
+                start_date = pd.to_datetime(start_date)
+            
             self.filtered_data = self.filtered_data[
                 self.filtered_data['date'] >= start_date
             ]
@@ -142,6 +150,10 @@ class FilterManager:
         if end_date is not None:
             if isinstance(end_date, str):
                 end_date = pd.to_datetime(end_date)
+            elif hasattr(end_date, 'date'):
+                # Convert date object to datetime for comparison
+                end_date = pd.to_datetime(end_date)
+            
             self.filtered_data = self.filtered_data[
                 self.filtered_data['date'] <= end_date
             ]

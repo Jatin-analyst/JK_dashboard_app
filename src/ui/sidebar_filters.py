@@ -202,12 +202,32 @@ class SidebarFilters:
         """Create temporal filter controls."""
         st.sidebar.subheader("📅 Temporal Filters")
         
-        # Date range
+        # Date range with improved error handling
         date_range = self.available_values.get('date_range', {})
-        if date_range:
-            min_date = date_range['min'].date() if hasattr(date_range['min'], 'date') else date_range['min']
-            max_date = date_range['max'].date() if hasattr(date_range['max'], 'date') else date_range['max']
+        if date_range and 'min' in date_range and 'max' in date_range:
+            try:
+                min_date = date_range['min']
+                max_date = date_range['max']
+                
+                # Convert to date objects if they're datetime
+                if hasattr(min_date, 'date'):
+                    min_date = min_date.date()
+                elif isinstance(min_date, str):
+                    min_date = pd.to_datetime(min_date).date()
+                
+                if hasattr(max_date, 'date'):
+                    max_date = max_date.date()
+                elif isinstance(max_date, str):
+                    max_date = pd.to_datetime(max_date).date()
+            except Exception as e:
+                min_date = None
+                max_date = None
+                st.sidebar.warning("Date range processing error: {}".format(str(e)))
+        else:
+            min_date = None
+            max_date = None
             
+        if min_date and max_date:
             start_date = st.sidebar.date_input(
                 "Start Date",
                 value=min_date,
@@ -565,7 +585,15 @@ class SidebarFilters:
             
         except Exception as e:
             st.sidebar.error("Error applying filters: {}".format(str(e)))
-            return data, {'error': str(e), 'original_records': len(data), 'filtered_records': len(data)}
+            return data, {
+                'error': str(e), 
+                'original_records': len(data), 
+                'filtered_records': len(data),
+                'records_removed': 0,
+                'retention_rate': 1.0,
+                'active_filters': 0,
+                'filter_details': {}
+            }
     
     def render_complete_sidebar(self, data):
         """
@@ -624,10 +652,11 @@ class SidebarFilters:
         # Main metrics
         col1, col2 = st.sidebar.columns(2)
         with col1:
+            records_removed = filter_summary.get('records_removed', 0)
             st.metric(
                 "Records", 
                 "{:,}".format(filter_summary['filtered_records']),
-                delta="-{:,}".format(filter_summary['records_removed']) if filter_summary['records_removed'] > 0 else None
+                delta="-{:,}".format(records_removed) if records_removed > 0 else None
             )
         with col2:
             st.metric(

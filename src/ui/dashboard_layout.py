@@ -348,14 +348,13 @@ class DashboardLayout:
                             opacity=0.7,
                             line=dict(width=0.5, color='white'),
                             colorbar=dict(
-                                title="{}".format(pollutant_type),
-                                titleside="right"
+                                title=dict(
+                                    text="{}".format(pollutant_type),
+                                    side="right"
+                                )
                             )
                         ),
-                        hovertemplate="<b>{}</b><br>".format(pollutant_type) +
-                                    "Value: %{y}<br>" +
-                                    "Index: %{x}<br>" +
-                                    "<extra></extra>",
+                        hovertemplate="<b>{}</b><br>Value: %{{y}}<br>Index: %{{x}}<br><extra></extra>".format(pollutant_type),
                         showlegend=True
                     ),
                     secondary_y=False,
@@ -370,10 +369,7 @@ class DashboardLayout:
                         name='Income Stress Index',
                         line=dict(color='#2E86AB', width=2),
                         marker=dict(size=6, color='#2E86AB', line=dict(width=1, color='white')),
-                        hovertemplate="<b>Income Stress</b><br>" +
-                                    "Value: %{y:.0f}<br>" +
-                                    "Index: %{x}<br>" +
-                                    "<extra></extra>",
+                        hovertemplate="<b>Income Stress</b><br>Value: %{{y:.0f}}<br>Index: %{{x}}<br><extra></extra>",
                         showlegend=True
                     ),
                     secondary_y=True,
